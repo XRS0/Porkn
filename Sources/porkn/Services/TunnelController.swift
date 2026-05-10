@@ -23,6 +23,11 @@ final class TunnelController: ObservableObject {
   }
 
   func connect(_ profile: TunnelProfile, mode: RoutingMode = .localProxy) async {
+    guard mode.isAvailable else {
+      fail(mode.availabilityNote ?? "Этот режим подключения пока недоступен")
+      return
+    }
+
     state = .connecting(profile)
     logLines.removeAll()
     appendLog("Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)")
@@ -131,8 +136,9 @@ final class TunnelController: ObservableObject {
   }
 
   private func appendLog(_ line: String) {
-    lastLogLine = line
-    logLines.append(line)
+    let safeLine = SensitiveRedactor.redact(line)
+    lastLogLine = safeLine
+    logLines.append(safeLine)
     if logLines.count > 200 {
       logLines.removeFirst(logLines.count - 200)
     }

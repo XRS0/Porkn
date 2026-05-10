@@ -86,7 +86,7 @@ private struct ConnectionCard: View {
         Task { await tunnelController.toggle(profile: profile, mode: routingMode) }
       } label: {
         Label(
-          tunnelController.state.isActive ? "Отключить" : "Подключить",
+          buttonTitle,
           systemImage: tunnelController.state.isActive
             ? "power.circle.fill" : "shield.lefthalf.filled"
         )
@@ -97,8 +97,22 @@ private struct ConnectionCard: View {
       .buttonStyle(.borderedProminent)
       .controlSize(.large)
       .tint(tunnelController.state.isActive ? .green : .blue)
+      .disabled(!routingMode.isAvailable && !tunnelController.state.isActive)
+
+      if let note = routingMode.availabilityNote {
+        Text(note)
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
     .myTunCard(material: .regularMaterial, radius: 22, padding: 22)
+  }
+
+  private var buttonTitle: String {
+    if tunnelController.state.isActive { return "Отключить" }
+    if !routingMode.isAvailable { return "Недоступно" }
+    return "Подключить"
   }
 }
 
@@ -176,6 +190,7 @@ private struct SingBoxPreviewCard: View {
   let profile: TunnelProfile
   @Binding var routingMode: RoutingMode
   @State private var revealConfig = false
+  @State private var revealSensitive = false
   private let generator = SingBoxConfigGenerator()
 
   var body: some View {
@@ -185,7 +200,7 @@ private struct SingBoxPreviewCard: View {
 
       Picker("Режим", selection: $routingMode) {
         ForEach(RoutingMode.allCases) { mode in
-          Text(mode.title).tag(mode)
+          Text(mode.title).tag(mode).disabled(!mode.isAvailable)
         }
       }
       .pickerStyle(.segmented)
@@ -196,7 +211,20 @@ private struct SingBoxPreviewCard: View {
         .lineLimit(3)
         .fixedSize(horizontal: false, vertical: true)
 
+      if let availabilityNote = routingMode.availabilityNote {
+        Label(availabilityNote, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+
       DisclosureGroup("Предпросмотр sing-box JSON", isExpanded: $revealConfig) {
+        Button(revealSensitive ? "Скрыть секреты" : "Reveal sensitive data") {
+          revealSensitive.toggle()
+        }
+        .font(.caption.weight(.medium))
+        .padding(.top, 8)
+
         ScrollView(.horizontal) {
           Text(configPreview)
             .font(.caption.monospaced())
@@ -211,7 +239,8 @@ private struct SingBoxPreviewCard: View {
 
   private var configPreview: String {
     do {
-      return try generator.generate(profile: profile, mode: routingMode)
+      let generated = try generator.generate(profile: profile, mode: routingMode)
+      return revealSensitive ? generated : SensitiveRedactor.redact(generated)
     } catch {
       return "// \(error.localizedDescription)"
     }
@@ -247,11 +276,18 @@ private struct RuntimeLogCard: View {
 private struct RawConfigCard: View {
   let rawConfig: String
   @State private var revealRaw = false
+  @State private var revealSensitive = false
 
   var body: some View {
     DisclosureGroup("Исходный конфиг", isExpanded: $revealRaw) {
+      Button(revealSensitive ? "Скрыть секреты" : "Reveal sensitive data") {
+        revealSensitive.toggle()
+      }
+      .font(.caption.weight(.medium))
+      .padding(.top, 8)
+
       ScrollView(.horizontal) {
-        Text(rawConfig)
+        Text(displayedRawConfig)
           .font(.caption.monospaced())
           .textSelection(.enabled)
           .padding(.top, 8)
@@ -259,6 +295,10 @@ private struct RawConfigCard: View {
       .frame(maxHeight: 160)
     }
     .myTunCard(material: .thinMaterial, radius: 18, padding: 18)
+  }
+
+  private var displayedRawConfig: String {
+    revealSensitive ? rawConfig : SensitiveRedactor.redact(rawConfig)
   }
 }
 

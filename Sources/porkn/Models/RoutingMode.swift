@@ -18,7 +18,20 @@ enum RoutingMode: String, CaseIterable, Identifiable {
     case .localProxy:
       "Запускает sing-box и автоматически включает HTTP/HTTPS/SOCKS proxy macOS на выбранный локальный порт 127.0.0.1:2080-2090."
     case .systemTun:
-      "Перехватывает системный трафик через TUN. На macOS потребует повышенных прав/NetworkExtension."
+      "Full VPN / TUN через NetworkExtension. Сейчас режим недоступен без Apple Developer entitlement packet-tunnel-provider."
     }
+  }
+
+  var isAvailable: Bool {
+    switch self {
+    case .localProxy: true
+    case .systemTun: false
+    }
+  }
+
+  var availabilityNote: String? {
+    isAvailable
+      ? nil
+      : "Experimental: нужен Apple Developer ID и NetworkExtension entitlement. System routes не меняются."
   }
 }
