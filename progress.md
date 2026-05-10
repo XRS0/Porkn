@@ -91,3 +91,31 @@
 - `/Users/rootix/Applications/porkn.app` пересобран и заменён из `dist/porkn.app`.
 - `codesign --verify --deep --strict /Users/rootix/Applications/porkn.app` — passed.
 - `scutil --proxy` после установки показывает только `FTPPassive : 1`, system proxy от porkn не остался включённым.
+
+## 2026-05-10 — TASK-009, TASK-010
+
+### TASK-009 — done
+- Добавлен `NetworkExtensionSupport` с явным entitlement gate: Full VPN/TUN доступен только для подписанного build с PacketTunnelProvider entitlement.
+- Добавлен build-ready skeleton `NetworkExtension/PacketTunnelProvider` с provider source и entitlements для будущего Xcode target.
+- Добавлен `PacketTunnelConfigHandoff` для передачи generated sing-box config через app group в будущий extension.
+- `RoutingMode.systemTun` теперь использует NetworkExtension availability status и fail-fast не меняет system proxy/routes в обычном build.
+- TUN sing-box config дополнен `stack: system` и `mtu`, тесты проверяют tun inbound / auto_route / strict_route.
+- Добавлена developer-инструкция `NetworkExtension/README.md` по app target, extension target, bundle IDs, entitlements и signing.
+
+### TASK-010 — done
+- Добавлен `.github/workflows/release.yml` для tag `v*` / manual workflow_dispatch: build arm64/x86_64 artifacts и upload в GitHub Release.
+- `script/package_release.sh` теперь прокидывает `APP_VERSION` / tag в Info.plist и собирает `CFBundleShortVersionString` + `CFBundleVersion`.
+- Release script теперь быстрее и понятнее падает при проблемах скачивания amd64 sing-box.
+- Добавлен `UpdateCheckService`: GitHub Releases latest API, semantic version compare, update result для UI.
+- В Settings добавлен блок Updates с кнопкой `Check for Updates`, результатом current/latest version и ссылкой на release page.
+- Добавлен план Sparkle rollout в `docs/Release/SPARKLE.md`.
+
+### Проверки
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter NetworkExtensionSupportTests` — passed, 3 tests.
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter UpdateCheckServiceTests` — passed, 2 tests.
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` — passed, 30 tests.
+- `./script/build_and_run.sh --verify` — passed.
+- `APP_VERSION=0.1.1 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh` — passed, generated arm64/x86_64 zips and SHA256SUMS.
+- `/Users/rootix/Applications/porkn.app` пересобран и заменён из `dist/porkn.app`.
+- `codesign --verify --deep --strict /Users/rootix/Applications/porkn.app` — passed.
+- `scutil --proxy` после установки показывает только `FTPPassive : 1`, system proxy от porkn не остался включённым.
