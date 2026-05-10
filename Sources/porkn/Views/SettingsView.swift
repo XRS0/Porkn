@@ -20,6 +20,9 @@ struct SettingsView: View {
   @State private var selectedTab: SettingsTab = .general
   @State private var lastAppliedRoutingSettings = RoutingSettings.current
   @State private var routingImportError: String?
+  @State private var updateResult: UpdateCheckResult?
+  @State private var updateError: String?
+  @State private var isCheckingForUpdates = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
@@ -86,6 +89,44 @@ struct SettingsView: View {
       }
 
       VPNStyleSettingsCard(
+        title: "Updates",
+        subtitle: "Проверка последнего GitHub Release и подготовка к Sparkle auto-update.",
+        systemImage: "arrow.down.circle"
+      ) {
+        VStack(alignment: .leading, spacing: 10) {
+          Button {
+            Task { await checkForUpdates() }
+          } label: {
+            Label(isCheckingForUpdates ? "Checking…" : "Check for Updates", systemImage: "arrow.clockwise")
+          }
+          .disabled(isCheckingForUpdates)
+
+          if let updateResult {
+            VStack(alignment: .leading, spacing: 4) {
+              Text(updateResult.title)
+                .font(.callout.weight(.semibold))
+              Text(updateResult.detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+              Link("Open release page", destination: updateResult.releaseURL)
+                .font(.caption.weight(.medium))
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+              (updateResult.isUpdateAvailable ? Color.blue : Color.green).opacity(0.10),
+              in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+          }
+
+          if let updateError {
+            Label(updateError, systemImage: "exclamationmark.triangle")
+              .font(.caption)
+              .foregroundStyle(.orange)
+          }
+        }
+      }
+
+      VPNStyleSettingsCard(
         title: "Core",
         subtitle: "Движок, который будет запускаться внутри приложения.",
         systemImage: "cpu"
@@ -106,6 +147,17 @@ struct SettingsView: View {
           .fixedSize(horizontal: false, vertical: true)
         }
       }
+    }
+  }
+
+  private func checkForUpdates() async {
+    isCheckingForUpdates = true
+    updateError = nil
+    defer { isCheckingForUpdates = false }
+    do {
+      updateResult = try await UpdateCheckService().check()
+    } catch {
+      updateError = "Не удалось проверить обновления: \(error.localizedDescription)"
     }
   }
 

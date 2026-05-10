@@ -5,6 +5,8 @@ APP_NAME="porkn"
 BUNDLE_ID="app.porkn.desktop"
 MIN_SYSTEM_VERSION="14.0"
 SING_BOX_VERSION="1.13.11"
+APP_VERSION="${APP_VERSION:-${GITHUB_REF_NAME:-0.1.0}}"
+APP_VERSION="${APP_VERSION#v}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"
@@ -26,12 +28,19 @@ ensure_sing_box_amd64() {
   if [[ ! -x "$binary" ]]; then
     rm -rf "$dir" "$DEPS_DIR/sing-box-amd64"
     if [[ ! -f "$archive" ]]; then
-      curl -fL --retry 3 \
+      curl -fL --retry 3 --connect-timeout 10 --max-time 120 \
         -o "$archive" \
-        "https://github.com/SagerNet/sing-box/releases/download/v$SING_BOX_VERSION/sing-box-$SING_BOX_VERSION-darwin-amd64.tar.gz"
+        "https://github.com/SagerNet/sing-box/releases/download/v$SING_BOX_VERSION/sing-box-$SING_BOX_VERSION-darwin-amd64.tar.gz" || {
+        echo "ERROR: failed to download amd64 sing-box. Check network/DNS or pre-seed $archive" >&2
+        return 1
+      }
     fi
     mkdir -p "$dir"
     tar -xzf "$archive" -C "$dir" --strip-components=1
+    if [[ ! -x "$binary" ]]; then
+      echo "ERROR: amd64 sing-box binary missing after extracting $archive" >&2
+      return 1
+    fi
     chmod +x "$binary"
   fi
 
@@ -81,6 +90,10 @@ stage_app() {
   <string>AppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>$APP_VERSION</string>
+  <key>CFBundleVersion</key>
+  <string>$APP_VERSION</string>
   <key>LSMinimumSystemVersion</key>
   <string>$MIN_SYSTEM_VERSION</string>
   <key>NSPrincipalClass</key>

@@ -18,20 +18,23 @@ enum RoutingMode: String, CaseIterable, Identifiable {
     case .localProxy:
       "Запускает sing-box и автоматически включает HTTP/HTTPS/SOCKS proxy macOS на выбранный локальный порт 127.0.0.1:2080-2090."
     case .systemTun:
-      "Full VPN / TUN через NetworkExtension. Сейчас режим недоступен без Apple Developer entitlement packet-tunnel-provider."
+      "Full VPN / TUN через PacketTunnelProvider. В этом build режим fail-fast без entitlement и не меняет system routes."
     }
   }
 
   var isAvailable: Bool {
     switch self {
     case .localProxy: true
-    case .systemTun: false
+    case .systemTun: NetworkExtensionSupport.isAvailable
     }
   }
 
   var availabilityNote: String? {
-    isAvailable
-      ? nil
-      : "Experimental: нужен Apple Developer ID и NetworkExtension entitlement. System routes не меняются."
+    switch self {
+    case .localProxy: nil
+    case .systemTun:
+      NetworkExtensionSupport.unavailableReason
+        ?? "Full VPN/TUN entitlement detected. PacketTunnelProvider handoff is experimental."
+    }
   }
 }

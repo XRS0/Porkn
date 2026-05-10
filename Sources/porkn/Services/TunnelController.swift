@@ -87,6 +87,9 @@ final class TunnelController: ObservableObject {
     _ profile: TunnelProfile, mode: RoutingMode, transitionID: UUID
   ) async {
     guard mode.isAvailable else {
+      if mode == .systemTun {
+        appendLog("Full VPN/TUN unavailable: system routes and system proxy were not changed")
+      }
       fail(mode.availabilityNote ?? "Этот режим подключения пока недоступен")
       return
     }
