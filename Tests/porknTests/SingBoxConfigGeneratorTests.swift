@@ -17,9 +17,11 @@ final class SingBoxConfigGeneratorTests: XCTestCase {
 
   func testGeneratesSOCKSLocalProxyConfig() throws {
     let profile = try ConfigParser().parseOne("socks://user:pass@127.0.0.1:1080#Local")
-    let json = try SingBoxConfigGenerator().generate(profile: profile, mode: .localProxy)
+    let json = try SingBoxConfigGenerator().generate(
+      profile: profile, mode: .localProxy, localProxyPort: 2081)
 
     XCTAssertTrue(json.contains("\"type\" : \"mixed\""))
+    XCTAssertTrue(json.contains("\"listen_port\" : 2081"))
     XCTAssertTrue(json.contains("\"type\" : \"socks\""))
     XCTAssertTrue(json.contains("\"username\" : \"user\""))
   }

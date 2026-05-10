@@ -38,9 +38,10 @@ final class TunnelController: ObservableObject {
       runtimeInfo = info
       switch mode {
       case .localProxy:
-        proxiedServices = try systemProxyManager.enableSystemProxy(host: "127.0.0.1", port: 2080)
+        proxiedServices = try systemProxyManager.enableSystemProxy(
+          host: info.localProxyHost, port: info.localProxyPort)
         appendLog("macOS system proxy включён для: \(proxiedServices.joined(separator: ", "))")
-        appendLog("sing-box запущен. Системный proxy: 127.0.0.1:2080")
+        appendLog("sing-box запущен. Системный proxy: \(info.localProxyEndpoint)")
       case .systemTun:
         appendLog("sing-box запущен в TUN-режиме")
       }

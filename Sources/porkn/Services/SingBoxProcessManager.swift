@@ -4,6 +4,10 @@ struct SingBoxRuntimeInfo: Equatable {
   let binaryURL: URL
   let configURL: URL
   let mode: RoutingMode
+  let localProxyHost: String
+  let localProxyPort: Int
+
+  var localProxyEndpoint: String { "\(localProxyHost):\(localProxyPort)" }
 }
 
 @MainActor
@@ -28,6 +32,7 @@ final class SingBoxProcessManager {
   private var process: Process?
   private var stdoutPipe: Pipe?
   private var stderrPipe: Pipe?
+  private var activeLocalProxyPort: Int?
   private let generator = SingBoxConfigGenerator()
   private let runtimeDirectory: URL
 
@@ -44,12 +49,24 @@ final class SingBoxProcessManager {
     onExit: @escaping @MainActor (Int32) -> Void
   ) throws -> SingBoxRuntimeInfo {
     guard process?.isRunning != true else { throw ManagerError.processAlreadyRunning }
-    PortGuard.freeLocalPort(2080)
+    let localProxyPort: Int
+    switch mode {
+    case .localProxy:
+      guard let availablePort = PortGuard.firstAvailablePort(in: PorknManagedProxy.portRange) else {
+        throw ManagerError.launchFailed(
+          "Все локальные proxy-порты \(PorknManagedProxy.portRange.lowerBound)-\(PorknManagedProxy.portRange.upperBound) заняты"
+        )
+      }
+      localProxyPort = availablePort
+    case .systemTun:
+      localProxyPort = PorknManagedProxy.defaultPort
+    }
     guard let binaryURL = Self.resolveBinaryURL() else { throw ManagerError.binaryNotFound }
 
     try FileManager.default.createDirectory(at: runtimeDirectory, withIntermediateDirectories: true)
     let configURL = runtimeDirectory.appendingPathComponent("active-sing-box.json")
-    let config = try generator.generate(profile: profile, mode: mode)
+    let config = try generator.generate(
+      profile: profile, mode: mode, localProxyPort: localProxyPort)
     try config.write(to: configURL, atomically: true, encoding: .utf8)
 
     let stdout = Pipe()
@@ -80,7 +97,14 @@ final class SingBoxProcessManager {
     process = proc
     stdoutPipe = stdout
     stderrPipe = stderr
-    return SingBoxRuntimeInfo(binaryURL: binaryURL, configURL: configURL, mode: mode)
+    activeLocalProxyPort = mode == .localProxy ? localProxyPort : nil
+    return SingBoxRuntimeInfo(
+      binaryURL: binaryURL,
+      configURL: configURL,
+      mode: mode,
+      localProxyHost: PorknManagedProxy.host,
+      localProxyPort: localProxyPort
+    )
   }
 
   func stop() {
@@ -105,7 +129,9 @@ final class SingBoxProcessManager {
       }
     }
 
-    PortGuard.freeLocalPort(2080)
+    if let activeLocalProxyPort {
+      PortGuard.freeLocalPort(activeLocalProxyPort)
+    }
     cleanup()
   }
 
@@ -113,6 +139,7 @@ final class SingBoxProcessManager {
     process = nil
     stdoutPipe = nil
     stderrPipe = nil
+    activeLocalProxyPort = nil
   }
 
   private func attachLogHandler(

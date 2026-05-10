@@ -17,16 +17,20 @@ struct SingBoxConfigGenerator {
   }
 
   func generate(
-    profile: TunnelProfile, mode: RoutingMode, routingSettings: RoutingSettings = .current
+    profile: TunnelProfile, mode: RoutingMode, routingSettings: RoutingSettings = .current,
+    localProxyPort: Int = PorknManagedProxy.defaultPort
   ) throws -> String {
-    let object = try generateObject(profile: profile, mode: mode, routingSettings: routingSettings)
+    let object = try generateObject(
+      profile: profile, mode: mode, routingSettings: routingSettings, localProxyPort: localProxyPort
+    )
     let data = try JSONSerialization.data(
       withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
     return String(data: data, encoding: .utf8) ?? "{}"
   }
 
   func generateObject(
-    profile: TunnelProfile, mode: RoutingMode, routingSettings: RoutingSettings = .current
+    profile: TunnelProfile, mode: RoutingMode, routingSettings: RoutingSettings = .current,
+    localProxyPort: Int = PorknManagedProxy.defaultPort
   ) throws -> [String: Any] {
     let routeRules = routeRules(mode: mode, routingSettings: routingSettings)
 
@@ -54,7 +58,7 @@ struct SingBoxConfigGenerator {
         ],
         "final": "cloudflare",
       ],
-      "inbounds": [inbound(mode: mode)],
+      "inbounds": [inbound(mode: mode, localProxyPort: localProxyPort)],
       "outbounds": [
         try outbound(profile: profile),
         ["type": "direct", "tag": "direct"],
@@ -95,14 +99,14 @@ struct SingBoxConfigGenerator {
     }
   }
 
-  private func inbound(mode: RoutingMode) -> [String: Any] {
+  private func inbound(mode: RoutingMode, localProxyPort: Int) -> [String: Any] {
     switch mode {
     case .localProxy:
       return [
         "type": "mixed",
         "tag": "mixed-in",
         "listen": "127.0.0.1",
-        "listen_port": 2080,
+        "listen_port": localProxyPort,
       ]
     case .systemTun:
       return [

@@ -2,7 +2,8 @@ import Foundation
 
 enum PorknManagedProxy {
   static let host = "127.0.0.1"
-  static let port = 2080
+  static let defaultPort = 2080
+  static let portRange: ClosedRange<Int> = 2080...2090
 }
 
 struct ProxyServiceState: Codable, Equatable {
@@ -18,9 +19,13 @@ struct ProxyState: Codable, Equatable {
   var port: Int
   var authenticated: Bool
 
-  func isManagedporknProxy(
-    host: String = PorknManagedProxy.host, port: Int = PorknManagedProxy.port
+  func isManagedPorknProxy(
+    host: String = PorknManagedProxy.host, ports: ClosedRange<Int> = PorknManagedProxy.portRange
   ) -> Bool {
+    enabled && server == host && ports.contains(port)
+  }
+
+  func isManagedPorknProxy(host: String = PorknManagedProxy.host, port: Int) -> Bool {
     enabled && server == host && self.port == port
   }
 }
@@ -53,14 +58,14 @@ final class SystemProxyManager {
   }
 
   func enableSystemProxy(
-    host: String = PorknManagedProxy.host, port: Int = PorknManagedProxy.port
+    host: String = PorknManagedProxy.host, port: Int = PorknManagedProxy.defaultPort
   ) throws -> [String] {
     // If the previous app run crashed, first return macOS to a clean state.
     // This avoids saving an already-orphaned 127.0.0.1:2080 proxy as the new baseline.
     if FileManager.default.fileExists(atPath: snapshotURL.path) {
       _ = try restoreSystemProxy()
     } else {
-      _ = try disableManagedProxyIfOrphaned(host: host, port: port)
+      _ = try disableManagedProxyIfOrphaned(host: host)
     }
 
     let services = try activeNetworkServicesForProxy()
@@ -109,11 +114,11 @@ final class SystemProxyManager {
     return snapshot.services.map(\.serviceName)
   }
 
-  /// Fail-safe cleanup for the exact proxy endpoint owned by porkn.
+  /// Fail-safe cleanup for proxy endpoints owned by porkn.
   /// It deliberately does not touch VPN services/routes/DNS or arbitrary user proxies.
   @discardableResult
   func disableManagedProxyIfOrphaned(
-    host: String = PorknManagedProxy.host, port: Int = PorknManagedProxy.port
+    host: String = PorknManagedProxy.host, ports: ClosedRange<Int> = PorknManagedProxy.portRange
   ) throws -> [String] {
     let services = try activeNetworkServicesForProxy()
     var changedServices: [String] = []
@@ -124,15 +129,15 @@ final class SystemProxyManager {
       let secureWeb = try readProxy(kind: .secureWeb, service: service)
       let socks = try readProxy(kind: .socks, service: service)
 
-      if web.isManagedporknProxy(host: host, port: port) {
+      if web.isManagedPorknProxy(host: host, ports: ports) {
         _ = try runNetworkSetup(["-setwebproxystate", service, "off"])
         changed = true
       }
-      if secureWeb.isManagedporknProxy(host: host, port: port) {
+      if secureWeb.isManagedPorknProxy(host: host, ports: ports) {
         _ = try runNetworkSetup(["-setsecurewebproxystate", service, "off"])
         changed = true
       }
-      if socks.isManagedporknProxy(host: host, port: port) {
+      if socks.isManagedPorknProxy(host: host, ports: ports) {
         _ = try runNetworkSetup(["-setsocksfirewallproxystate", service, "off"])
         changed = true
       }

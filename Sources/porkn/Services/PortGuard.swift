@@ -1,6 +1,20 @@
 import Foundation
 
 enum PortGuard {
+  static func firstAvailablePort(in range: ClosedRange<Int>, processName: String = "sing-box")
+    -> Int?
+  {
+    for port in range {
+      freeLocalPort(port, processName: processName)
+      if isLocalPortFree(port) { return port }
+    }
+    return nil
+  }
+
+  static func isLocalPortFree(_ port: Int) -> Bool {
+    pidsListening(on: port).isEmpty
+  }
+
   static func freeLocalPort(_ port: Int, processName: String = "sing-box") {
     let pids = pidsListening(on: port)
     for pid in pids {

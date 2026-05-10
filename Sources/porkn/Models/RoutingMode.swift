@@ -16,7 +16,7 @@ enum RoutingMode: String, CaseIterable, Identifiable {
   var detail: String {
     switch self {
     case .localProxy:
-      "Запускает sing-box и автоматически включает HTTP/HTTPS/SOCKS proxy macOS на 127.0.0.1:2080."
+      "Запускает sing-box и автоматически включает HTTP/HTTPS/SOCKS proxy macOS на выбранный локальный порт 127.0.0.1:2080-2090."
     case .systemTun:
       "Перехватывает системный трафик через TUN. На macOS потребует повышенных прав/NetworkExtension."
     }
