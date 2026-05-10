@@ -13,7 +13,7 @@ final class PortGuardTests: XCTestCase {
   }
 }
 
-private final class TCPTestListener {
+final class TCPTestListener {
   let socketFD: Int32
   let port: Int
 

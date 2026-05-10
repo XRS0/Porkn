@@ -7,9 +7,11 @@ final class TunnelController: ObservableObject {
   @Published private(set) var logLines: [String] = []
   @Published private(set) var runtimeInfo: SingBoxRuntimeInfo?
   @Published private(set) var proxiedServices: [String] = []
+  @Published private(set) var healthStatus: ProxyHealthStatus = .notChecked
 
   private let processManager = SingBoxProcessManager()
   private let systemProxyManager = SystemProxyManager()
+  private let healthCheckService = ProxyHealthCheckService()
   private var activeRunID: UUID?
   private var transitionID: UUID?
 
@@ -121,6 +123,9 @@ final class TunnelController: ObservableObject {
         return
       }
       state = .connected(profile, connectedAt: Date())
+      if mode == .localProxy {
+        runHealthCheck(host: info.localProxyHost, port: info.localProxyPort, runID: runID)
+      }
     } catch {
       activeRunID = nil
       processManager.stop()
@@ -138,6 +143,7 @@ final class TunnelController: ObservableObject {
       appendLog("macOS system proxy восстановлен для: \(restored.joined(separator: ", "))")
     }
     proxiedServices = []
+    healthStatus = .notChecked
     processManager.stop()
     runtimeInfo = nil
   }
@@ -174,6 +180,7 @@ final class TunnelController: ObservableObject {
       appendLog("macOS system proxy восстановлен для: \(restored.joined(separator: ", "))")
     }
     proxiedServices = []
+    healthStatus = .notChecked
     if !wasDisconnecting {
       state = status == 0 ? .disconnected : .failed("sing-box завершился с кодом \(status)")
     }
@@ -187,6 +194,21 @@ final class TunnelController: ObservableObject {
     runtimeInfo = nil
     activeRunID = nil
     proxiedServices = []
+    healthStatus = .notChecked
+  }
+
+  private func runHealthCheck(host: String, port: Int, runID: UUID) {
+    healthStatus = .checking
+    appendLog("Проверяю proxy health для \(host):\(port)")
+    Task { [weak self] in
+      guard let self else { return }
+      let status = await healthCheckService.check(host: host, port: port)
+      await MainActor.run {
+        guard self.activeRunID == runID else { return }
+        self.healthStatus = status
+        self.appendLog("Health check: \(status.title) — \(status.detail)")
+      }
+    }
   }
 
   private func appendLog(_ line: String) {

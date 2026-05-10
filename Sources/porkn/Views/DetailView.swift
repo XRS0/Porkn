@@ -75,12 +75,21 @@ private struct ConnectionCard: View {
             .foregroundStyle(.secondary)
             .lineLimit(2)
             .textSelection(.enabled)
+
+          if let runtimeInfo = tunnelController.runtimeInfo {
+            Text("Local proxy: \(runtimeInfo.localProxyEndpoint)")
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+              .textSelection(.enabled)
+          }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
 
         ProtocolBadge(profile.proto)
           .fixedSize()
       }
+
+      HealthStatusRow(status: tunnelController.healthStatus)
 
       Button {
         Task { await tunnelController.toggle(profile: profile, mode: routingMode) }
@@ -113,6 +122,49 @@ private struct ConnectionCard: View {
     if tunnelController.state.isActive { return "Отключить" }
     if !routingMode.isAvailable { return "Недоступно" }
     return "Подключить"
+  }
+}
+
+private struct HealthStatusRow: View {
+  let status: ProxyHealthStatus
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: icon)
+        .foregroundStyle(color)
+        .frame(width: 18)
+      VStack(alignment: .leading, spacing: 3) {
+        Text(status.title)
+          .font(.callout.weight(.semibold))
+          .foregroundStyle(color)
+        Text(status.detail)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      Spacer(minLength: 0)
+    }
+    .padding(12)
+    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+  }
+
+  private var icon: String {
+    switch status {
+    case .protected: "shield.checkered"
+    case .proxyReachable: "checkmark.circle.fill"
+    case .checking: "hourglass"
+    case .remoteCheckFailed, .localProxyFailed: "exclamationmark.triangle.fill"
+    case .notChecked: "shield"
+    }
+  }
+
+  private var color: Color {
+    switch status {
+    case .protected, .proxyReachable: .green
+    case .checking: .blue
+    case .remoteCheckFailed, .localProxyFailed: .orange
+    case .notChecked: .secondary
+    }
   }
 }
 
