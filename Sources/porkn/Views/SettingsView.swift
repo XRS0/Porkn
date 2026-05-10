@@ -7,6 +7,8 @@ struct SettingsView: View {
   var reconnectAction: ((TunnelProfile) -> Void)?
   @AppStorage("launchAtLogin") private var launchAtLogin = false
   @AppStorage("autoConnectLastProfile") private var autoConnectLastProfile = false
+  @AppStorage(KillSwitchPolicy.storageKey) private var killSwitchEnabled = false
+  @AppStorage("appLanguage") private var appLanguageRaw = AppLanguage.ru.rawValue
   @AppStorage("preferredCore") private var preferredCore = "sing-box"
   @AppStorage("subscriptionAutoRefreshInterval") private var subscriptionAutoRefreshRaw =
     SubscriptionAutoRefreshInterval.off.rawValue
@@ -48,27 +50,62 @@ struct SettingsView: View {
   private var generalSettings: some View {
     VStack(alignment: .leading, spacing: 16) {
       VPNStyleSettingsCard(
-        title: "Запуск",
-        subtitle: "Поведение приложения при старте macOS и запуске porkn.",
+        title: t("Интерфейс", "Interface"),
+        subtitle: t("Язык приложения и локальные параметры отображения.", "Application language and local display preferences."),
+        systemImage: "globe"
+      ) {
+        VStack(alignment: .leading, spacing: 10) {
+          Picker(t("Язык", "Language"), selection: $appLanguageRaw) {
+            ForEach(AppLanguage.allCases) { language in
+              Text(language.title).tag(language.rawValue)
+            }
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+
+          Text(t("Изменение применяется сразу для новых экранов и настроек.", "The change applies immediately to new screens and settings."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      VPNStyleSettingsCard(
+        title: t("Безопасность", "Security"),
+        subtitle: t("Kill Switch защищает от прямого трафика при аварийном падении runtime.", "Kill Switch protects against direct traffic if the runtime crashes unexpectedly."),
+        systemImage: "lock.shield"
+      ) {
+        SettingToggleRow(
+          title: "Kill Switch",
+          subtitle: t(
+            "Если sing-box неожиданно завершится во время подключения, porkn оставит macOS proxy на локальном endpoint, чтобы трафик не пошёл напрямую. Ручное отключение всё равно восстанавливает proxy.",
+            "If sing-box exits unexpectedly while connected, porkn keeps macOS proxy pointed at the local endpoint to prevent direct traffic. Manual disconnect still restores proxy."
+          ),
+          isOn: $killSwitchEnabled
+        )
+      }
+
+      VPNStyleSettingsCard(
+        title: t("Запуск", "Startup"),
+        subtitle: t("Поведение приложения при старте macOS и запуске porkn.", "Behavior when macOS starts and porkn opens."),
         systemImage: "power"
       ) {
         SettingToggleRow(
-          title: "Подключаться к последнему профилю",
-          subtitle: "Автоматически выбрать и подключить последний сервер при открытии приложения.",
+          title: t("Подключаться к последнему профилю", "Connect to last profile"),
+          subtitle: t("Автоматически выбрать и подключить последний сервер при открытии приложения.", "Automatically select and connect the last server when the app opens."),
           isOn: $autoConnectLastProfile
         )
 
         SettingToggleRow(
-          title: "Запускать porkn при входе",
-          subtitle: "Будет доступно после подписанного .app bundle и настройки Login Items.",
+          title: t("Запускать porkn при входе", "Launch porkn at login"),
+          subtitle: t("Будет доступно после подписанного .app bundle и настройки Login Items.", "Will be available after signed .app bundle and Login Items setup."),
           isOn: $launchAtLogin,
           isDisabled: true
         )
       }
 
       VPNStyleSettingsCard(
-        title: "Subscriptions",
-        subtitle: "Автообновление subscription URL и refresh при запуске.",
+        title: t("Подписки", "Subscriptions"),
+        subtitle: t("Автообновление subscription URL и refresh при запуске.", "Auto-refresh subscription URLs and refresh on launch."),
         systemImage: "arrow.triangle.2.circlepath"
       ) {
         VStack(alignment: .leading, spacing: 12) {
@@ -81,16 +118,16 @@ struct SettingsView: View {
           .labelsHidden()
 
           SettingToggleRow(
-            title: "Refresh on app launch",
-            subtitle: "При открытии porkn сразу проверять subscription URL и показывать diff summary.",
+            title: t("Обновлять при запуске", "Refresh on app launch"),
+            subtitle: t("При открытии porkn сразу проверять subscription URL и показывать diff summary.", "Check subscription URLs when porkn opens and show a diff summary."),
             isOn: $refreshSubscriptionsOnLaunch
           )
         }
       }
 
       VPNStyleSettingsCard(
-        title: "Updates",
-        subtitle: "Проверка последнего GitHub Release и подготовка к Sparkle auto-update.",
+        title: t("Обновления", "Updates"),
+        subtitle: t("Проверка последнего GitHub Release и подготовка к Sparkle auto-update.", "Check the latest GitHub Release and prepare Sparkle auto-update."),
         systemImage: "arrow.down.circle"
       ) {
         VStack(alignment: .leading, spacing: 10) {
@@ -127,12 +164,12 @@ struct SettingsView: View {
       }
 
       VPNStyleSettingsCard(
-        title: "Core",
-        subtitle: "Движок, который будет запускаться внутри приложения.",
+        title: t("Ядро", "Core"),
+        subtitle: t("Движок, который будет запускаться внутри приложения.", "The core runtime bundled and launched by the app."),
         systemImage: "cpu"
       ) {
         VStack(alignment: .leading, spacing: 10) {
-          Picker("Движок", selection: $preferredCore) {
+          Picker(t("Движок", "Core"), selection: $preferredCore) {
             Text("sing-box").tag("sing-box")
             Text("Xray-core").tag("xray")
           }
@@ -140,7 +177,7 @@ struct SettingsView: View {
           .labelsHidden()
 
           Text(
-            "Сейчас используется встроенный sing-box: он лежит внутри porkn.app и переносится вместе с приложением."
+            t("Сейчас используется встроенный sing-box: он лежит внутри porkn.app и переносится вместе с приложением.", "porkn currently uses bundled sing-box inside porkn.app, so it moves with the app.")
           )
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -150,6 +187,14 @@ struct SettingsView: View {
     }
   }
 
+  private var appLanguage: AppLanguage {
+    AppLanguage(rawValue: appLanguageRaw) ?? .ru
+  }
+
+  private func t(_ ru: String, _ en: String) -> String {
+    L10n.text(ru, en, language: appLanguage)
+  }
+
   private func checkForUpdates() async {
     isCheckingForUpdates = true
     updateError = nil
@@ -157,7 +202,7 @@ struct SettingsView: View {
     do {
       updateResult = try await UpdateCheckService().check()
     } catch {
-      updateError = "Не удалось проверить обновления: \(error.localizedDescription)"
+      updateError = t("Не удалось проверить обновления", "Failed to check updates") + ": \(error.localizedDescription)"
     }
   }
 

@@ -178,11 +178,21 @@ final class TunnelController: ObservableObject {
     guard wasConnectedOrSwitching || wasDisconnecting else { return }
 
     appendLog("sing-box завершился с кодом \(status)")
-    let restored = (try? systemProxyManager.restoreSystemProxy()) ?? []
-    if !restored.isEmpty {
-      appendLog("macOS system proxy восстановлен для: \(restored.joined(separator: ", "))")
+    let preserveProxy = KillSwitchPolicy.shouldPreserveSystemProxyOnUnexpectedExit(
+      wasDisconnecting: wasDisconnecting, wasConnectedOrSwitching: wasConnectedOrSwitching)
+
+    if preserveProxy {
+      appendLog(
+        "Kill Switch активен: macOS system proxy оставлен на porkn endpoint, чтобы заблокировать прямой трафик"
+      )
+    } else {
+      let restored = (try? systemProxyManager.restoreSystemProxy()) ?? []
+      if !restored.isEmpty {
+        appendLog("macOS system proxy восстановлен для: \(restored.joined(separator: ", "))")
+      }
+      proxiedServices = []
     }
-    proxiedServices = []
+
     healthStatus = .notChecked
     if !wasDisconnecting {
       state = status == 0 ? .disconnected : .failed("sing-box завершился с кодом \(status)")
