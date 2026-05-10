@@ -31,6 +31,8 @@ struct SidebarView: View {
       }
 
       Section("Профили") {
+        profileActions
+
         if profileStore.profiles.isEmpty {
           VStack(alignment: .leading, spacing: 8) {
             Label("Нет конфигов", systemImage: "link.badge.plus")
@@ -69,6 +71,32 @@ struct SidebarView: View {
     .listStyle(.sidebar)
     .navigationTitle("porkn")
   }
+
+  private var profileActions: some View {
+    HStack(spacing: 8) {
+      Button {
+        Task { await profileStore.pingAll() }
+      } label: {
+        Label(
+          profileStore.isPingingAll ? "Ping…" : "Ping All",
+          systemImage: "antenna.radiowaves.left.and.right")
+      }
+      .disabled(profileStore.profiles.isEmpty || profileStore.isPingingAll)
+
+      Button {
+        if let fastest = profileStore.selectFastestProfile() {
+          selection = .profile(fastest.id)
+        }
+      } label: {
+        Label("Auto fastest", systemImage: "bolt.fill")
+      }
+      .disabled(!profileStore.profiles.contains { $0.lastPingMilliseconds != nil })
+    }
+    .font(.caption.weight(.medium))
+    .buttonStyle(.borderless)
+    .padding(.vertical, 4)
+  }
+
 }
 
 private struct SubscriptionRow: View {
@@ -130,11 +158,20 @@ private struct ProfileRow: View {
           }
         }
 
-        Text("\(profile.proto.displayName) · \(profile.endpoint)")
-          .font(.caption)
-          .foregroundStyle(isConnected ? .green : .secondary)
-          .lineLimit(1)
-          .truncationMode(.middle)
+        HStack(spacing: 6) {
+          Text("\(profile.proto.displayName) · \(profile.endpoint)")
+            .lineLimit(1)
+            .truncationMode(.middle)
+
+          Spacer(minLength: 4)
+
+          Text(Formatters.latency(profile.lastPingMilliseconds))
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(profile.lastPingMilliseconds == nil ? Color.secondary : Color.blue)
+            .fixedSize()
+        }
+        .font(.caption)
+        .foregroundStyle(isConnected ? .green : .secondary)
       }
     }
   }

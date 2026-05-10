@@ -5,6 +5,7 @@ final class ProfileStore: ObservableObject {
   @Published private(set) var profiles: [TunnelProfile] = []
   @Published private(set) var subscriptions: [Subscription] = []
   @Published var selectedProfileID: TunnelProfile.ID?
+  @Published private(set) var isPingingAll = false
 
   private let parser = ConfigParser()
   private let profilesFileURL: URL
@@ -167,10 +168,42 @@ final class ProfileStore: ObservableObject {
     save()
   }
 
-  func updatePing(for profileID: TunnelProfile.ID, milliseconds: Int) {
+  func updatePing(for profileID: TunnelProfile.ID, milliseconds: Int?) {
     guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
     profiles[index].lastPingMilliseconds = milliseconds
     save()
+  }
+
+  func pingAll(using pingService: PingService = PingService()) async {
+    guard !isPingingAll else { return }
+    isPingingAll = true
+    defer { isPingingAll = false }
+
+    let snapshot = profiles
+    await withTaskGroup(of: (TunnelProfile.ID, Int?).self) { group in
+      for profile in snapshot {
+        group.addTask {
+          let value = await pingService.measure(profile: profile)
+          return (profile.id, value)
+        }
+      }
+
+      for await (profileID, value) in group {
+        updatePing(for: profileID, milliseconds: value)
+      }
+    }
+  }
+
+  @discardableResult
+  func selectFastestProfile() -> TunnelProfile? {
+    guard
+      let fastest =
+        profiles
+        .filter({ $0.lastPingMilliseconds != nil })
+        .min(by: { ($0.lastPingMilliseconds ?? Int.max) < ($1.lastPingMilliseconds ?? Int.max) })
+    else { return nil }
+    selectedProfileID = fastest.id
+    return fastest
   }
 
   func load() {
