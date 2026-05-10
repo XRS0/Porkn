@@ -11,6 +11,7 @@ final class TunnelController: ObservableObject {
   private let processManager = SingBoxProcessManager()
   private let systemProxyManager = SystemProxyManager()
   private var activeRunID: UUID?
+  private var transitionID: UUID?
 
   func toggle(profile: TunnelProfile?, mode: RoutingMode = .localProxy) async {
     if state.isActive {
@@ -23,14 +24,78 @@ final class TunnelController: ObservableObject {
   }
 
   func connect(_ profile: TunnelProfile, mode: RoutingMode = .localProxy) async {
+    let transitionID = beginTransition()
+    defer { endTransition(transitionID) }
+
+    await connectWithinCurrentTransition(profile, mode: mode, transitionID: transitionID)
+  }
+
+  func disconnect() async {
+    let transitionID = beginTransition()
+    defer { endTransition(transitionID) }
+
+    state = .disconnecting
+    stopRuntimeAndRestoreProxy(logPrefix: "Отключение sing-box")
+    guard isCurrentTransition(transitionID) else { return }
+    state = .disconnected
+    appendLog("Отключено")
+  }
+
+  func switchTo(profile: TunnelProfile, mode: RoutingMode = .localProxy, force: Bool = false) async
+  {
+    if currentProfileID == profile.id, state.isActive, !force {
+      return
+    }
+
+    let transitionID = beginTransition()
+    defer { endTransition(transitionID) }
+
+    let previousProfile = currentProfile
+    if let previousProfile, state.isActive || state.isTransitioning {
+      state = .switching(from: previousProfile, to: profile)
+      appendLog("Переключение с \(previousProfile.name) на \(profile.name)")
+      stopRuntimeAndRestoreProxy(logPrefix: "Останавливаю старое подключение")
+    }
+
+    guard isCurrentTransition(transitionID) else { return }
+    await connectWithinCurrentTransition(profile, mode: mode, transitionID: transitionID)
+  }
+
+  func currentProfile(in profiles: [TunnelProfile]) -> TunnelProfile? {
+    guard let currentProfileID else { return nil }
+    return profiles.first { $0.id == currentProfileID }
+  }
+
+  var currentProfileID: TunnelProfile.ID? {
+    currentProfile?.id
+  }
+
+  private var currentProfile: TunnelProfile? {
+    switch state {
+    case .connecting(let profile), .connected(let profile, _):
+      profile
+    case .switching(_, let target):
+      target
+    default:
+      nil
+    }
+  }
+
+  private func connectWithinCurrentTransition(
+    _ profile: TunnelProfile, mode: RoutingMode, transitionID: UUID
+  ) async {
     guard mode.isAvailable else {
       fail(mode.availabilityNote ?? "Этот режим подключения пока недоступен")
       return
     }
 
-    state = .connecting(profile)
-    logLines.removeAll()
-    appendLog("Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)")
+    state = state.isTransitioning ? state : .connecting(profile)
+    if case .switching = state {
+      appendLog("Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)")
+    } else {
+      logLines.removeAll()
+      appendLog("Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)")
+    }
 
     do {
       let runID = UUID()
@@ -50,6 +115,11 @@ final class TunnelController: ObservableObject {
       case .systemTun:
         appendLog("sing-box запущен в TUN-режиме")
       }
+      guard isCurrentTransition(transitionID) else {
+        processManager.stop()
+        _ = try? systemProxyManager.restoreSystemProxy()
+        return
+      }
       state = .connected(profile, connectedAt: Date())
     } catch {
       activeRunID = nil
@@ -60,10 +130,9 @@ final class TunnelController: ObservableObject {
     }
   }
 
-  func disconnect() async {
-    state = .disconnecting
+  private func stopRuntimeAndRestoreProxy(logPrefix: String) {
     activeRunID = nil
-    appendLog("Отключение sing-box")
+    appendLog(logPrefix)
     let restored = (try? systemProxyManager.restoreSystemProxy()) ?? []
     if !restored.isEmpty {
       appendLog("macOS system proxy восстановлен для: \(restored.joined(separator: ", "))")
@@ -71,48 +140,33 @@ final class TunnelController: ObservableObject {
     proxiedServices = []
     processManager.stop()
     runtimeInfo = nil
-    state = .disconnected
-    appendLog("Отключено")
   }
 
-  func switchTo(profile: TunnelProfile, mode: RoutingMode = .localProxy, force: Bool = false) async
-  {
-    if currentProfileID == profile.id, state.isActive, !force {
-      return
-    }
-
-    if state.isActive || state == .disconnecting {
-      appendLog("Переключение на \(profile.name)")
-      await disconnect()
-    }
-
-    await connect(profile, mode: mode)
+  private func beginTransition() -> UUID {
+    let id = UUID()
+    transitionID = id
+    return id
   }
 
-  func currentProfile(in profiles: [TunnelProfile]) -> TunnelProfile? {
-    guard let currentProfileID else { return nil }
-    return profiles.first { $0.id == currentProfileID }
+  private func endTransition(_ id: UUID) {
+    if transitionID == id { transitionID = nil }
   }
 
-  var currentProfileID: TunnelProfile.ID? {
-    switch state {
-    case .connecting(let profile), .connected(let profile, _):
-      profile.id
-    default:
-      nil
-    }
+  private func isCurrentTransition(_ id: UUID) -> Bool {
+    transitionID == id
   }
 
   private func handleProcessExit(status: Int32, runID: UUID) {
     guard activeRunID == runID else { return }
     let wasDisconnecting = state == .disconnecting
-    let wasConnected: Bool
-    if case .connected = state {
-      wasConnected = true
-    } else {
-      wasConnected = false
+    let wasConnectedOrSwitching: Bool
+    switch state {
+    case .connected, .switching:
+      wasConnectedOrSwitching = true
+    default:
+      wasConnectedOrSwitching = false
     }
-    guard wasConnected || wasDisconnecting else { return }
+    guard wasConnectedOrSwitching || wasDisconnecting else { return }
 
     appendLog("sing-box завершился с кодом \(status)")
     let restored = (try? systemProxyManager.restoreSystemProxy()) ?? []
