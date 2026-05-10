@@ -7,6 +7,7 @@ struct SidebarView: View {
   @AppStorage("profileSortMode") private var sortModeRaw = ProfileSortMode.favoritesFirst.rawValue
   @AppStorage("favoritesOnly") private var favoritesOnly = false
   @State private var searchText = ""
+  @FocusState private var isSearchFocused: Bool
 
   private var sortMode: ProfileSortMode {
     get { ProfileSortMode(rawValue: sortModeRaw) ?? .favoritesFirst }
@@ -102,6 +103,15 @@ struct SidebarView: View {
     VStack(spacing: 8) {
       TextField("Search name, host, protocol…", text: $searchText)
         .textFieldStyle(.roundedBorder)
+        .focused($isSearchFocused)
+        .onAppear {
+          DispatchQueue.main.async {
+            isSearchFocused = false
+          }
+          DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            isSearchFocused = false
+          }
+        }
 
       HStack(spacing: 8) {
         Toggle(isOn: $favoritesOnly) {
