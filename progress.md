@@ -67,3 +67,27 @@
 - `/Users/rootix/Applications/porkn.app` пересобран и заменён из `dist/porkn.app`.
 - `codesign --verify --deep --strict /Users/rootix/Applications/porkn.app` — passed.
 - `scutil --proxy` после установки показывает только `FTPPassive : 1`, system proxy от porkn не остался включённым.
+
+## 2026-05-10 — TASK-006, TASK-007
+
+### TASK-006 — done
+- Добавлены настройки подписок: Auto refresh subscription — Off / Every 6 hours / Every 12 hours / Daily, плюс Refresh on app launch.
+- `ProfileStore` теперь считает refresh diff summary: added / updated / removed / total и показывает последний summary в sidebar.
+- Профили получили `isFavorite` и `lastUsedAt` с backward-compatible decoding для старых `profiles.json`.
+- В sidebar добавлены поиск по name/host/protocol/subscription, Favorites only и сортировки Favorites first / Fastest first / Name / Recently used.
+- Favorites доступны через context menu профиля; ping, favorite и last used сохраняются в profiles store.
+
+### TASK-007 — done
+- Главный экран теперь показывает крупный пользовательский статус: Off / Connecting / Protected / Failed / Switching.
+- Основная карточка подключения сохраняет текущий сервер, protocol, local proxy endpoint и health check result.
+- Runtime logs переименованы в Advanced Logs и скрыты по умолчанию в collapsible блоке.
+- Empty state для пустого списка профилей получил кнопки Import Subscription и Add SOCKS.
+- Добавлен onboarding первого запуска с шагами импорта, ping/auto fastest и routing settings.
+
+### Проверки
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter ProfileListSettingsTests` — passed, 3 tests.
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` — passed, 25 tests.
+- `./script/build_and_run.sh --verify` — passed.
+- `/Users/rootix/Applications/porkn.app` пересобран и заменён из `dist/porkn.app`.
+- `codesign --verify --deep --strict /Users/rootix/Applications/porkn.app` — passed.
+- `scutil --proxy` после установки показывает только `FTPPassive : 1`, system proxy от porkn не остался включённым.
