@@ -14,6 +14,8 @@ struct TunnelProfile: Identifiable, Codable, Hashable {
   var subscriptionKey: String?
   var createdAt: Date
   var lastPingMilliseconds: Int?
+  var isFavorite: Bool
+  var lastUsedAt: Date?
 
   init(
     id: UUID = UUID(),
@@ -28,7 +30,9 @@ struct TunnelProfile: Identifiable, Codable, Hashable {
     subscriptionID: UUID? = nil,
     subscriptionKey: String? = nil,
     createdAt: Date = Date(),
-    lastPingMilliseconds: Int? = nil
+    lastPingMilliseconds: Int? = nil,
+    isFavorite: Bool = false,
+    lastUsedAt: Date? = nil
   ) {
     self.id = id
     self.name = name
@@ -43,6 +47,45 @@ struct TunnelProfile: Identifiable, Codable, Hashable {
     self.subscriptionKey = subscriptionKey
     self.createdAt = createdAt
     self.lastPingMilliseconds = lastPingMilliseconds
+    self.isFavorite = isFavorite
+    self.lastUsedAt = lastUsedAt
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id
+    case name
+    case proto
+    case serverHost
+    case serverPort
+    case rawConfig
+    case username
+    case password
+    case queryItems
+    case subscriptionID
+    case subscriptionKey
+    case createdAt
+    case lastPingMilliseconds
+    case isFavorite
+    case lastUsedAt
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(UUID.self, forKey: .id)
+    name = try container.decode(String.self, forKey: .name)
+    proto = try container.decode(ProxyProtocol.self, forKey: .proto)
+    serverHost = try container.decode(String.self, forKey: .serverHost)
+    serverPort = try container.decodeIfPresent(Int.self, forKey: .serverPort)
+    rawConfig = try container.decode(String.self, forKey: .rawConfig)
+    username = try container.decodeIfPresent(String.self, forKey: .username)
+    password = try container.decodeIfPresent(String.self, forKey: .password)
+    queryItems = try container.decodeIfPresent([String: String].self, forKey: .queryItems) ?? [:]
+    subscriptionID = try container.decodeIfPresent(UUID.self, forKey: .subscriptionID)
+    subscriptionKey = try container.decodeIfPresent(String.self, forKey: .subscriptionKey)
+    createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+    lastPingMilliseconds = try container.decodeIfPresent(Int.self, forKey: .lastPingMilliseconds)
+    isFavorite = try container.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+    lastUsedAt = try container.decodeIfPresent(Date.self, forKey: .lastUsedAt)
   }
 
   var primaryUser: String? {

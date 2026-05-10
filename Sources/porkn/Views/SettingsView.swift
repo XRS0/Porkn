@@ -8,6 +8,9 @@ struct SettingsView: View {
   @AppStorage("launchAtLogin") private var launchAtLogin = false
   @AppStorage("autoConnectLastProfile") private var autoConnectLastProfile = false
   @AppStorage("preferredCore") private var preferredCore = "sing-box"
+  @AppStorage("subscriptionAutoRefreshInterval") private var subscriptionAutoRefreshRaw =
+    SubscriptionAutoRefreshInterval.off.rawValue
+  @AppStorage("refreshSubscriptionsOnLaunch") private var refreshSubscriptionsOnLaunch = false
   @AppStorage(RoutingSettings.presetStorageKey) private var routingPresetRaw =
     RoutingPreset.directRuSu.rawValue
   @AppStorage(RoutingSettings.directDomainsStorageKey) private var directDomainsText =
@@ -58,6 +61,28 @@ struct SettingsView: View {
           isOn: $launchAtLogin,
           isDisabled: true
         )
+      }
+
+      VPNStyleSettingsCard(
+        title: "Subscriptions",
+        subtitle: "Автообновление subscription URL и refresh при запуске.",
+        systemImage: "arrow.triangle.2.circlepath"
+      ) {
+        VStack(alignment: .leading, spacing: 12) {
+          Picker("Auto refresh subscription", selection: $subscriptionAutoRefreshRaw) {
+            ForEach(SubscriptionAutoRefreshInterval.allCases) { interval in
+              Text(interval.title).tag(interval.rawValue)
+            }
+          }
+          .pickerStyle(.segmented)
+          .labelsHidden()
+
+          SettingToggleRow(
+            title: "Refresh on app launch",
+            subtitle: "При открытии porkn сразу проверять subscription URL и показывать diff summary.",
+            isOn: $refreshSubscriptionsOnLaunch
+          )
+        }
       }
 
       VPNStyleSettingsCard(

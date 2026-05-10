@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ContentView: View {
@@ -7,6 +8,10 @@ struct ContentView: View {
   @State private var showingSOCKSForm = false
   @State private var selection: AppSelection?
   @State private var lastSelectedProfileID: TunnelProfile.ID?
+  @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+  @AppStorage("subscriptionAutoRefreshInterval") private var subscriptionAutoRefreshRaw =
+    SubscriptionAutoRefreshInterval.off.rawValue
+  @AppStorage("refreshSubscriptionsOnLaunch") private var refreshSubscriptionsOnLaunch = false
 
   var body: some View {
     NavigationSplitView {
@@ -66,10 +71,31 @@ struct ContentView: View {
     .onReceive(NotificationCenter.default.publisher(for: .showImportSheet)) { _ in
       showingImport = true
     }
+    .onReceive(NotificationCenter.default.publisher(for: .showSOCKSSheet)) { _ in
+      showingSOCKSForm = true
+    }
+    .sheet(isPresented: Binding(get: { !hasCompletedOnboarding }, set: { if !$0 { hasCompletedOnboarding = true } })) {
+      OnboardingView(
+        importAction: {
+          hasCompletedOnboarding = true
+          showingImport = true
+        },
+        socksAction: {
+          hasCompletedOnboarding = true
+          showingSOCKSForm = true
+        },
+        skipAction: { hasCompletedOnboarding = true }
+      )
+    }
     .onAppear {
       if selection == nil, let first = profileStore.profiles.first {
         selection = .profile(first.id)
         lastSelectedProfileID = first.id
+      }
+      Task {
+        await profileStore.refreshSubscriptionsIfNeeded(
+          interval: SubscriptionAutoRefreshInterval(rawValue: subscriptionAutoRefreshRaw) ?? .off,
+          refreshOnLaunch: refreshSubscriptionsOnLaunch)
       }
     }
     .onChange(of: profileStore.selectedProfileID) { _, newValue in
@@ -93,6 +119,7 @@ struct ContentView: View {
     guard lastSelectedProfileID != newID else { return }
     lastSelectedProfileID = newID
     profileStore.selectedProfileID = newID
+    profileStore.markUsed(newID)
 
     guard tunnelController.state.isActive,
       tunnelController.currentProfileID != newID,
@@ -103,6 +130,69 @@ struct ContentView: View {
 
     Task {
       await tunnelController.switchTo(profile: profile, mode: .localProxy)
+    }
+  }
+}
+
+
+private struct OnboardingView: View {
+  let importAction: () -> Void
+  let socksAction: () -> Void
+  let skipAction: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 22) {
+      HStack(spacing: 14) {
+        Image(nsImage: NSApp.applicationIconImage)
+          .resizable()
+          .frame(width: 58, height: 58)
+          .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        VStack(alignment: .leading, spacing: 4) {
+          Text("Добро пожаловать в porkn")
+            .font(.title2.weight(.semibold))
+          Text("Импортируй подписку или добавь SOCKS, выбери сервер и подключайся.")
+            .foregroundStyle(.secondary)
+        }
+      }
+
+      VStack(alignment: .leading, spacing: 12) {
+        OnboardingStep(index: 1, title: "Импортируй subscription URL", detail: "porkn обновит профили и покажет diff summary.")
+        OnboardingStep(index: 2, title: "Проверь ping и выбери сервер", detail: "Используй Ping All и Auto fastest в sidebar.")
+        OnboardingStep(index: 3, title: "Настрой routing", detail: "Direct / Proxy / Block domains доступны в Settings.")
+      }
+
+      HStack {
+        Button("Позже") { skipAction() }
+        Spacer()
+        Button("Add SOCKS") { socksAction() }
+        Button("Import Subscription") { importAction() }
+          .buttonStyle(.borderedProminent)
+      }
+    }
+    .padding(28)
+    .frame(width: 560)
+  }
+}
+
+private struct OnboardingStep: View {
+  let index: Int
+  let title: String
+  let detail: String
+
+  var body: some View {
+    HStack(alignment: .top, spacing: 12) {
+      Text("\(index)")
+        .font(.caption.weight(.bold))
+        .foregroundStyle(.white)
+        .frame(width: 24, height: 24)
+        .background(Color.accentColor, in: Circle())
+      VStack(alignment: .leading, spacing: 3) {
+        Text(title)
+          .font(.callout.weight(.semibold))
+        Text(detail)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
     }
   }
 }

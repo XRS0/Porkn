@@ -51,4 +51,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension Notification.Name {
   static let showImportSheet = Notification.Name("porkn.showImportSheet")
+  static let showSOCKSSheet = Notification.Name("porkn.showSOCKSSheet")
 }

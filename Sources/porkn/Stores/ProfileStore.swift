@@ -6,6 +6,8 @@ final class ProfileStore: ObservableObject {
   @Published private(set) var subscriptions: [Subscription] = []
   @Published var selectedProfileID: TunnelProfile.ID?
   @Published private(set) var isPingingAll = false
+  @Published private(set) var lastRefreshSummary: SubscriptionRefreshSummary?
+  @Published private(set) var isRefreshingSubscriptions = false
 
   private let parser = ConfigParser()
   private let profilesFileURL: URL
@@ -36,8 +38,22 @@ final class ProfileStore: ObservableObject {
   }
 
   func refresh(_ subscription: Subscription) async throws -> [TunnelProfile] {
+    let result = try await refreshWithSummary(subscription)
+    return result.profiles
+  }
+
+  func refreshWithSummary(_ subscription: Subscription) async throws -> (profiles: [TunnelProfile], summary: SubscriptionRefreshSummary) {
     let (data, _) = try await URLSession.shared.data(from: subscription.url)
-    guard let body = String(data: data, encoding: .utf8) else { return [] }
+    guard let body = String(data: data, encoding: .utf8) else {
+      let summary = SubscriptionRefreshSummary(
+        added: 0, updated: 0, removed: 0, total: 0, subscriptionName: subscription.name, refreshedAt: Date())
+      lastRefreshSummary = summary
+      return ([], summary)
+    }
+    return try refresh(subscription: subscription, body: body)
+  }
+
+  func refresh(subscription: Subscription, body: String) throws -> (profiles: [TunnelProfile], summary: SubscriptionRefreshSummary) {
     let imported = try parser.parseMany(body)
       .map { profile in
         var profile = profile
@@ -45,13 +61,28 @@ final class ProfileStore: ObservableObject {
         profile.subscriptionKey = profile.stableKey
         return profile
       }
-    upsertSubscriptionProfiles(imported, subscriptionID: subscription.id)
+    let diff = upsertSubscriptionProfiles(imported, subscriptionID: subscription.id)
+    let refreshedAt = Date()
     if let index = subscriptions.firstIndex(where: { $0.id == subscription.id }) {
-      subscriptions[index].lastRefreshAt = Date()
+      subscriptions[index].lastRefreshAt = refreshedAt
       subscriptions[index].lastImportedCount = imported.count
     }
+    let summary = SubscriptionRefreshSummary(
+      added: diff.added, updated: diff.updated, removed: diff.removed, total: imported.count,
+      subscriptionName: subscription.name, refreshedAt: refreshedAt)
+    lastRefreshSummary = summary
     save()
-    return imported
+    return (imported, summary)
+  }
+
+  func refreshSubscriptionsIfNeeded(interval: SubscriptionAutoRefreshInterval, refreshOnLaunch: Bool = false) async {
+    guard !isRefreshingSubscriptions, interval != .off || refreshOnLaunch else { return }
+    isRefreshingSubscriptions = true
+    defer { isRefreshingSubscriptions = false }
+
+    for subscription in subscriptions where shouldRefresh(subscription, interval: interval, refreshOnLaunch: refreshOnLaunch) {
+      _ = try? await refreshWithSummary(subscription)
+    }
   }
 
   private func upsertSubscription(_ subscription: Subscription) {
@@ -85,7 +116,8 @@ final class ProfileStore: ObservableObject {
     if selectedProfileID == nil { selectedProfileID = inserted.first?.id ?? imported.first?.id }
   }
 
-  private func upsertSubscriptionProfiles(_ imported: [TunnelProfile], subscriptionID: UUID) {
+  @discardableResult
+  private func upsertSubscriptionProfiles(_ imported: [TunnelProfile], subscriptionID: UUID) -> (added: Int, updated: Int, removed: Int) {
     let importedKeys = Set(imported.map(\.stableKey))
     var existingByKey: [String: Int] = [:]
     for (index, profile) in profiles.enumerated() where profile.subscriptionID == subscriptionID {
@@ -93,15 +125,20 @@ final class ProfileStore: ObservableObject {
     }
 
     var inserted: [TunnelProfile] = []
+    var updated = 0
     for profile in imported {
       if let index = existingByKey[profile.stableKey] {
         profiles[index] = mergedProfile(existing: profiles[index], incoming: profile)
+        updated += 1
       } else {
         profiles.append(profile)
         inserted.append(profile)
       }
     }
 
+    let removed = profiles.filter { profile in
+      profile.subscriptionID == subscriptionID && !importedKeys.contains(profile.stableKey)
+    }.count
     profiles.removeAll { profile in
       profile.subscriptionID == subscriptionID && !importedKeys.contains(profile.stableKey)
     }
@@ -110,6 +147,7 @@ final class ProfileStore: ObservableObject {
       self.selectedProfileID = profiles.first?.id
     }
     if selectedProfileID == nil { selectedProfileID = inserted.first?.id ?? imported.first?.id }
+    return (inserted.count, updated, removed)
   }
 
   private func mergedProfile(existing: TunnelProfile, incoming: TunnelProfile) -> TunnelProfile {
@@ -117,6 +155,8 @@ final class ProfileStore: ObservableObject {
     merged.id = existing.id
     merged.createdAt = existing.createdAt
     merged.lastPingMilliseconds = existing.lastPingMilliseconds
+    merged.isFavorite = existing.isFavorite
+    merged.lastUsedAt = existing.lastUsedAt
     if merged.subscriptionID == nil { merged.subscriptionID = existing.subscriptionID }
     if merged.subscriptionKey == nil {
       merged.subscriptionKey = existing.subscriptionKey ?? incoming.stableKey
@@ -168,6 +208,55 @@ final class ProfileStore: ObservableObject {
     save()
   }
 
+  func toggleFavorite(_ profile: TunnelProfile) {
+    guard let index = profiles.firstIndex(where: { $0.id == profile.id }) else { return }
+    profiles[index].isFavorite.toggle()
+    save()
+  }
+
+  func markUsed(_ profileID: TunnelProfile.ID, at date: Date = Date()) {
+    guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
+    profiles[index].lastUsedAt = date
+    save()
+  }
+
+  func filteredProfiles(searchText: String, favoritesOnly: Bool, sortMode: ProfileSortMode) -> [TunnelProfile] {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    var result = profiles.filter { profile in
+      (!favoritesOnly || profile.isFavorite)
+        && (query.isEmpty
+          || profile.name.lowercased().contains(query)
+          || profile.serverHost.lowercased().contains(query)
+          || profile.proto.displayName.lowercased().contains(query)
+          || subscriptionName(for: profile).lowercased().contains(query))
+    }
+
+    result.sort { left, right in
+      switch sortMode {
+      case .favoritesFirst:
+        if left.isFavorite != right.isFavorite { return left.isFavorite && !right.isFavorite }
+        return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+      case .fastestFirst:
+        switch (left.lastPingMilliseconds, right.lastPingMilliseconds) {
+        case let (l?, r?) where l != r: return l < r
+        case (_?, nil): return true
+        case (nil, _?): return false
+        default: return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+        }
+      case .name:
+        return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+      case .recentlyUsed:
+        return (left.lastUsedAt ?? .distantPast) > (right.lastUsedAt ?? .distantPast)
+      }
+    }
+    return result
+  }
+
+  func subscriptionName(for profile: TunnelProfile) -> String {
+    guard let subscriptionID = profile.subscriptionID else { return "Manual" }
+    return subscriptions.first { $0.id == subscriptionID }?.name ?? "Subscription"
+  }
+
   func updatePing(for profileID: TunnelProfile.ID, milliseconds: Int?) {
     guard let index = profiles.firstIndex(where: { $0.id == profileID }) else { return }
     profiles[index].lastPingMilliseconds = milliseconds
@@ -204,6 +293,15 @@ final class ProfileStore: ObservableObject {
     else { return nil }
     selectedProfileID = fastest.id
     return fastest
+  }
+
+  private func shouldRefresh(
+    _ subscription: Subscription, interval: SubscriptionAutoRefreshInterval, refreshOnLaunch: Bool
+  ) -> Bool {
+    if refreshOnLaunch { return true }
+    guard let seconds = interval.timeInterval else { return false }
+    guard let lastRefreshAt = subscription.lastRefreshAt else { return true }
+    return Date().timeIntervalSince(lastRefreshAt) >= seconds
   }
 
   func load() {

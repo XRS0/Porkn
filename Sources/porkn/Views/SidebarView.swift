@@ -4,6 +4,18 @@ struct SidebarView: View {
   @EnvironmentObject private var profileStore: ProfileStore
   @EnvironmentObject private var tunnelController: TunnelController
   @Binding var selection: AppSelection?
+  @AppStorage("profileSortMode") private var sortModeRaw = ProfileSortMode.favoritesFirst.rawValue
+  @AppStorage("favoritesOnly") private var favoritesOnly = false
+  @State private var searchText = ""
+
+  private var sortMode: ProfileSortMode {
+    get { ProfileSortMode(rawValue: sortModeRaw) ?? .favoritesFirst }
+    nonmutating set { sortModeRaw = newValue.rawValue }
+  }
+
+  private var visibleProfiles: [TunnelProfile] {
+    profileStore.filteredProfiles(searchText: searchText, favoritesOnly: favoritesOnly, sortMode: sortMode)
+  }
 
   var body: some View {
     List(selection: $selection) {
@@ -18,7 +30,7 @@ struct SidebarView: View {
             SubscriptionRow(subscription: subscription)
               .contextMenu {
                 Button("Обновить") {
-                  Task { _ = try? await profileStore.refresh(subscription) }
+                  Task { _ = try? await profileStore.refreshWithSummary(subscription) }
                 }
                 Button(role: .destructive) {
                   profileStore.delete(subscription)
@@ -28,31 +40,39 @@ struct SidebarView: View {
               }
           }
         }
+
+        if let summary = profileStore.lastRefreshSummary {
+          RefreshSummaryRow(summary: summary)
+        }
       }
 
       Section("Профили") {
         profileActions
 
         if profileStore.profiles.isEmpty {
-          VStack(alignment: .leading, spacing: 8) {
-            Label("Нет конфигов", systemImage: "link.badge.plus")
-              .font(.callout.weight(.medium))
-            Text("Импортируй subscription URL, VLESS, VMess, Trojan, SS или SOCKS.")
-              .font(.caption)
-              .foregroundStyle(.secondary)
-              .lineLimit(3)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-          .padding(.vertical, 12)
+          EmptyProfilesSidebarRow()
+        } else if visibleProfiles.isEmpty {
+          Text("Ничего не найдено")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 10)
         } else {
-          ForEach(profileStore.profiles) { profile in
+          ForEach(visibleProfiles) { profile in
             ProfileRow(
               profile: profile,
+              subscriptionName: profileStore.subscriptionName(for: profile),
               isConnected: tunnelController.currentProfileID == profile.id
                 && tunnelController.state.isActive
             )
             .tag(AppSelection.profile(profile.id))
             .contextMenu {
+              Button {
+                profileStore.toggleFavorite(profile)
+              } label: {
+                Label(
+                  profile.isFavorite ? "Убрать из Favorites" : "Добавить в Favorites",
+                  systemImage: profile.isFavorite ? "star.slash" : "star")
+              }
               Button(role: .destructive) {
                 profileStore.delete(profile)
               } label: {
@@ -68,8 +88,38 @@ struct SidebarView: View {
           .tag(AppSelection.settings)
       }
     }
+    .safeAreaInset(edge: .top) {
+      profileSearchControls
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.bar)
+    }
     .listStyle(.sidebar)
     .navigationTitle("porkn")
+  }
+
+  private var profileSearchControls: some View {
+    VStack(spacing: 8) {
+      TextField("Search name, host, protocol…", text: $searchText)
+        .textFieldStyle(.roundedBorder)
+
+      HStack(spacing: 8) {
+        Toggle(isOn: $favoritesOnly) {
+          Label("Favorites", systemImage: "star.fill")
+        }
+        .toggleStyle(.button)
+        .controlSize(.small)
+
+        Picker("Sort", selection: Binding(get: { sortMode }, set: { sortMode = $0 })) {
+          ForEach(ProfileSortMode.allCases) { mode in
+            Text(mode.title).tag(mode)
+          }
+        }
+        .labelsHidden()
+        .controlSize(.small)
+        .frame(maxWidth: .infinity)
+      }
+    }
   }
 
   private var profileActions: some View {
@@ -96,7 +146,6 @@ struct SidebarView: View {
     .buttonStyle(.borderless)
     .padding(.vertical, 4)
   }
-
 }
 
 private struct SubscriptionRow: View {
@@ -116,13 +165,47 @@ private struct SubscriptionRow: View {
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .truncationMode(.middle)
+        if let lastRefreshAt = subscription.lastRefreshAt {
+          Text("Last refresh: \(lastRefreshAt.formatted(date: .abbreviated, time: .shortened))")
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
       }
     }
   }
 }
 
+private struct RefreshSummaryRow: View {
+  let summary: SubscriptionRefreshSummary
+
+  var body: some View {
+    Label(summary.shortText, systemImage: "checkmark.seal")
+      .font(.caption2.weight(.medium))
+      .foregroundStyle(.green)
+      .lineLimit(3)
+      .fixedSize(horizontal: false, vertical: true)
+      .padding(.vertical, 6)
+  }
+}
+
+private struct EmptyProfilesSidebarRow: View {
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label("Нет конфигов", systemImage: "link.badge.plus")
+        .font(.callout.weight(.medium))
+      Text("Импортируй subscription URL, VLESS, VMess, Trojan, SS или SOCKS.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(3)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(.vertical, 12)
+  }
+}
+
 private struct ProfileRow: View {
   let profile: TunnelProfile
+  let subscriptionName: String
   let isConnected: Bool
 
   var body: some View {
@@ -143,6 +226,11 @@ private struct ProfileRow: View {
 
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 6) {
+          if profile.isFavorite {
+            Image(systemName: "star.fill")
+              .font(.caption2)
+              .foregroundStyle(.yellow)
+          }
           Text(profile.name)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -172,6 +260,11 @@ private struct ProfileRow: View {
         }
         .font(.caption)
         .foregroundStyle(isConnected ? .green : .secondary)
+
+        Text(subscriptionName)
+          .font(.caption2)
+          .foregroundStyle(.tertiary)
+          .lineLimit(1)
       }
     }
   }

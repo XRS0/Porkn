@@ -35,9 +35,9 @@ struct DetailView: View {
 
   private var header: some View {
     VStack(alignment: .leading, spacing: 8) {
-      Text(tunnelController.state.title)
+      Text(statusTitle)
         .font(.system(size: 36, weight: .semibold, design: .rounded))
-        .foregroundStyle(tunnelController.state.isActive ? .green : .primary)
+        .foregroundStyle(statusColor)
         .lineLimit(2)
         .minimumScaleFactor(0.82)
       Text(tunnelController.lastLogLine)
@@ -47,6 +47,45 @@ struct DetailView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
+  }
+
+  private var statusTitle: String {
+    switch tunnelController.state {
+    case .disconnected:
+      return "Off"
+    case .connecting:
+      return "Connecting"
+    case .disconnecting:
+      return "Disconnecting"
+    case .connected:
+      switch tunnelController.healthStatus {
+      case .protected, .proxyReachable:
+        return "Protected"
+      case .checking:
+        return "Checking protection"
+      case .remoteCheckFailed, .localProxyFailed:
+        return "Connected with warning"
+      case .notChecked:
+        return "Connected"
+      }
+    case .failed:
+      return "Failed"
+    case .switching:
+      return "Switching"
+    }
+  }
+
+  private var statusColor: Color {
+    switch tunnelController.state {
+    case .connected:
+      return .green
+    case .failed:
+      return .red
+    case .connecting, .disconnecting, .switching:
+      return .blue
+    case .disconnected:
+      return .primary
+    }
   }
 
   private func ping(_ profile: TunnelProfile) async {
@@ -301,10 +340,10 @@ private struct SingBoxPreviewCard: View {
 
 private struct RuntimeLogCard: View {
   let lines: [String]
-  @State private var revealLogs = true
+  @State private var revealLogs = false
 
   var body: some View {
-    DisclosureGroup("Логи подключения", isExpanded: $revealLogs) {
+    DisclosureGroup("Advanced Logs", isExpanded: $revealLogs) {
       if lines.isEmpty {
         Text("Логи появятся после запуска sing-box.")
           .font(.caption)
@@ -356,13 +395,32 @@ private struct RawConfigCard: View {
 
 private struct EmptyStateCard: View {
   var body: some View {
-    ContentUnavailableView(
-      "Начни с импорта конфига",
-      systemImage: "shield.slash",
-      description: Text(
-        "Поддержим subscription URL, SOCKS proxy, VLESS/Xray-compatible конфиги и затем подключим реальный tunnel через sing-box/NetworkExtension."
+    VStack(spacing: 18) {
+      ContentUnavailableView(
+        "Начни с импорта конфига",
+        systemImage: "shield.slash",
+        description: Text(
+          "Поддержим subscription URL, SOCKS proxy, VLESS/Xray-compatible конфиги и затем подключим реальный tunnel через sing-box/NetworkExtension."
+        )
       )
-    )
+
+      HStack(spacing: 12) {
+        Button {
+          NotificationCenter.default.post(name: .showImportSheet, object: nil)
+        } label: {
+          Label("Import Subscription", systemImage: "square.and.arrow.down")
+        }
+        .buttonStyle(.borderedProminent)
+
+        Button {
+          NotificationCenter.default.post(name: .showSOCKSSheet, object: nil)
+        } label: {
+          Label("Add SOCKS", systemImage: "point.3.connected.trianglepath.dotted")
+        }
+        .buttonStyle(.bordered)
+      }
+      .padding(.bottom, 24)
+    }
     .frame(maxWidth: .infinity, minHeight: 360)
     .myTunCard(material: .regularMaterial, radius: 24, padding: 0)
   }
