@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -7,9 +8,15 @@ struct SettingsView: View {
   @AppStorage("launchAtLogin") private var launchAtLogin = false
   @AppStorage("autoConnectLastProfile") private var autoConnectLastProfile = false
   @AppStorage("preferredCore") private var preferredCore = "sing-box"
+  @AppStorage(RoutingSettings.presetStorageKey) private var routingPresetRaw =
+    RoutingPreset.directRuSu.rawValue
   @AppStorage(RoutingSettings.directDomainsStorageKey) private var directDomainsText =
     RoutingSettings.defaultDirectDomainsText
+  @AppStorage(RoutingSettings.proxyDomainsStorageKey) private var proxyDomainsText = ""
+  @AppStorage(RoutingSettings.blockDomainsStorageKey) private var blockDomainsText = ""
   @State private var selectedTab: SettingsTab = .general
+  @State private var lastAppliedRoutingSettings = RoutingSettings.current
+  @State private var routingImportError: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
@@ -80,23 +87,60 @@ struct SettingsView: View {
   private var routingSettings: some View {
     VStack(alignment: .leading, spacing: 16) {
       VPNStyleSettingsCard(
-        title: "Direct domains",
-        subtitle:
-          "Домены, которые идут напрямую, в обход VLESS/proxy. Изменения применятся после переподключения.",
-        systemImage: "arrow.triangle.branch"
+        title: "Routing preset",
+        subtitle: "Быстрый выбор базовой стратегии маршрутизации.",
+        systemImage: "point.topleft.down.curvedto.point.bottomright.up"
       ) {
-        TextEditor(text: $directDomainsText)
-          .font(.body.monospaced())
-          .scrollContentBackground(.hidden)
-          .frame(minHeight: 220)
-          .padding(12)
-          .background(
-            .background.opacity(0.52), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        Picker("Routing preset", selection: $routingPresetRaw) {
+          ForEach(RoutingPreset.allCases) { preset in
+            Text(preset.title).tag(preset.rawValue)
+          }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+
+        Text(currentRoutingPreset.detail)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+
+        if hasPendingRoutingChanges {
+          Label(
+            "Routing changes are pending. Нажми Apply & Reconnect для активного подключения.",
+            systemImage: "exclamationmark.circle.fill"
+          )
+          .font(.caption.weight(.medium))
+          .foregroundStyle(.orange)
+        }
+      }
+
+      VPNStyleSettingsCard(
+        title: "Domain groups",
+        subtitle: "Direct, Proxy и Block правила генерируются в sing-box route rules.",
+        systemImage: "list.bullet.rectangle"
+      ) {
+        VStack(spacing: 14) {
+          DomainGroupEditor(
+            title: "Direct domains",
+            subtitle: "Идут напрямую в обход proxy",
+            text: $directDomainsText
+          )
+          DomainGroupEditor(
+            title: "Proxy domains",
+            subtitle: "Явно идут через proxy-out",
+            text: $proxyDomainsText
+          )
+          DomainGroupEditor(
+            title: "Block domains",
+            subtitle: "Блокируются outbound block",
+            text: $blockDomainsText
+          )
+        }
       }
 
       VPNStyleSettingsCard(
         title: "Быстрые пресеты",
-        subtitle: "Добавь частые direct-правила одной кнопкой.",
+        subtitle: "Добавь частые правила одной кнопкой.",
         systemImage: "wand.and.stars"
       ) {
         VStack(alignment: .leading, spacing: 12) {
@@ -105,23 +149,35 @@ struct SettingsView: View {
             spacing: 10
           ) {
             PresetButton(
-              title: "RU/SU зоны", subtitle: "*.ru, *.su", systemImage: "globe.europe.africa"
+              title: "RU/SU зоны", subtitle: "*.ru, *.su → direct",
+              systemImage: "globe.europe.africa"
             ) {
-              appendDomains(["*.ru", "*.su"])
+              routingPresetRaw = RoutingPreset.directRuSu.rawValue
+              directDomainsText = appendingDomains(["*.ru", "*.su"], to: directDomainsText)
             }
             PresetButton(
               title: "Продуктовые", subtitle: "x.com, YouTube, Google", systemImage: "app.badge"
             ) {
-              appendDomains([
-                "x.com", "twitter.com", "instagram.com", "facebook.com", "youtube.com",
-                "google.com",
-              ])
+              routingPresetRaw = RoutingPreset.directSelected.rawValue
+              directDomainsText = appendingDomains(
+                [
+                  "x.com", "twitter.com", "instagram.com", "facebook.com", "youtube.com",
+                  "google.com",
+                ], to: directDomainsText)
+            }
+            PresetButton(
+              title: "Bypass LAN", subtitle: "Private IP → direct", systemImage: "network"
+            ) {
+              routingPresetRaw = RoutingPreset.bypassLan.rawValue
             }
             PresetButton(
               title: "Сбросить", subtitle: "Вернуть дефолт", systemImage: "arrow.counterclockwise",
               role: .destructive
             ) {
+              routingPresetRaw = RoutingPreset.directRuSu.rawValue
               directDomainsText = RoutingSettings.defaultDirectDomainsText
+              proxyDomainsText = ""
+              blockDomainsText = ""
             }
           }
 
@@ -134,11 +190,30 @@ struct SettingsView: View {
       }
 
       VPNStyleSettingsCard(
+        title: "Import / Export",
+        subtitle: "Перенос routing settings между устройствами через JSON.",
+        systemImage: "square.and.arrow.up.on.square"
+      ) {
+        HStack(spacing: 10) {
+          Button("Copy JSON") { exportRoutingToClipboard() }
+          Button("Import from Clipboard") { importRoutingFromClipboard() }
+        }
+        .buttonStyle(.bordered)
+
+        if let routingImportError {
+          Text(routingImportError)
+            .font(.caption)
+            .foregroundStyle(.red)
+        }
+      }
+
+      VPNStyleSettingsCard(
         title: "Применить изменения",
         subtitle: reconnectSubtitle,
         systemImage: "arrow.triangle.2.circlepath"
       ) {
         Button {
+          lastAppliedRoutingSettings = currentRoutingSettings
           if let connectedProfile {
             reconnectAction?(connectedProfile)
           }
@@ -158,19 +233,30 @@ struct SettingsView: View {
       }
 
       VPNStyleSettingsCard(
-        title: "Предпросмотр правила",
-        subtitle: "Так porkn добавит direct routing в generated sing-box config.",
+        title: "Предпросмотр правил",
+        subtitle: "Так porkn добавит routing в generated sing-box config.",
         systemImage: "doc.text.magnifyingglass"
       ) {
-        let parsed = DomainRuleParser.parse(directDomainsText)
-        PreviewRow(
-          title: "domain_suffix",
-          value: parsed.domainSuffix.isEmpty ? "—" : parsed.domainSuffix.joined(separator: ", "))
-        PreviewRow(
-          title: "domain",
-          value: parsed.domain.isEmpty ? "—" : parsed.domain.joined(separator: ", "))
+        RoutingPreview(settings: currentRoutingSettings)
       }
     }
+  }
+
+  private var currentRoutingPreset: RoutingPreset {
+    RoutingPreset(rawValue: routingPresetRaw) ?? .directRuSu
+  }
+
+  private var currentRoutingSettings: RoutingSettings {
+    RoutingSettings(
+      preset: currentRoutingPreset,
+      directDomainsText: directDomainsText,
+      proxyDomainsText: proxyDomainsText,
+      blockDomainsText: blockDomainsText
+    )
+  }
+
+  private var hasPendingRoutingChanges: Bool {
+    currentRoutingSettings != lastAppliedRoutingSettings
   }
 
   private var reconnectSubtitle: String {
@@ -182,15 +268,43 @@ struct SettingsView: View {
       "Сейчас нет активного подключения. Новые правила автоматически применятся при следующем подключении."
   }
 
-  private func appendDomains(_ domains: [String]) {
-    var parsed = DomainRuleParser.parse(directDomainsText).domainSuffix
+  private func appendingDomains(_ domains: [String], to text: String) -> String {
+    var parsed = DomainRuleParser.parse(text).domainSuffix
     for domain in domains {
       let normalized = DomainRuleParser.parse(domain).domainSuffix
       for item in normalized where !parsed.contains(item) {
         parsed.append(item)
       }
     }
-    directDomainsText = parsed.map { "*.\($0)" }.joined(separator: "\n")
+    return parsed.map { "*.\($0)" }.joined(separator: "\n")
+  }
+
+  private func exportRoutingToClipboard() {
+    routingImportError = nil
+    do {
+      let json = try currentRoutingSettings.exportJSONString()
+      NSPasteboard.general.clearContents()
+      NSPasteboard.general.setString(json, forType: .string)
+    } catch {
+      routingImportError = error.localizedDescription
+    }
+  }
+
+  private func importRoutingFromClipboard() {
+    routingImportError = nil
+    guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else {
+      routingImportError = "Clipboard is empty"
+      return
+    }
+    do {
+      let settings = try RoutingSettings.importJSONString(text)
+      routingPresetRaw = settings.preset.rawValue
+      directDomainsText = settings.directDomainsText
+      proxyDomainsText = settings.proxyDomainsText
+      blockDomainsText = settings.blockDomainsText
+    } catch {
+      routingImportError = "Invalid routing JSON: \(error.localizedDescription)"
+    }
   }
 }
 
@@ -354,6 +468,58 @@ private struct HelpChip: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .background(
         .background.opacity(0.36), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+  }
+}
+
+private struct DomainGroupEditor: View {
+  let title: String
+  let subtitle: String
+  @Binding var text: String
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 2) {
+          Text(title)
+            .font(.callout.weight(.semibold))
+          Text(subtitle)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        Spacer()
+        Text("\(DomainRuleParser.parse(text).domainSuffix.count) rules")
+          .font(.caption2.monospacedDigit())
+          .foregroundStyle(.secondary)
+      }
+
+      TextEditor(text: $text)
+        .font(.body.monospaced())
+        .scrollContentBackground(.hidden)
+        .frame(minHeight: 90)
+        .padding(10)
+        .background(
+          .background.opacity(0.52), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+  }
+}
+
+private struct RoutingPreview: View {
+  let settings: RoutingSettings
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      PreviewRow(title: "preset", value: settings.preset.title)
+      PreviewRow(
+        title: "direct domain_suffix", value: previewDomains(settings.effectiveDirectDomainsText))
+      PreviewRow(title: "proxy domain_suffix", value: previewDomains(settings.proxyDomainsText))
+      PreviewRow(title: "block domain_suffix", value: previewDomains(settings.blockDomainsText))
+      PreviewRow(title: "route rules", value: "\(settings.routeRules.count) custom rules")
+    }
+  }
+
+  private func previewDomains(_ text: String) -> String {
+    let parsed = DomainRuleParser.parse(text).domainSuffix
+    return parsed.isEmpty ? "—" : parsed.joined(separator: ", ")
   }
 }
 

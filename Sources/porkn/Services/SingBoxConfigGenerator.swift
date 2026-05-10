@@ -85,9 +85,7 @@ struct SingBoxConfigGenerator {
       ]
     ]
 
-    if let directDomainRule = routingSettings.directDomainRule {
-      rules.append(directDomainRule)
-    }
+    rules.append(contentsOf: routingSettings.routeRules)
 
     return rules
   }

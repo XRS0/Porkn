@@ -42,3 +42,28 @@
 - `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` — passed, 19 tests.
 - `./script/build_and_run.sh --verify` — pending in final verification step after this progress entry.
 
+
+## 2026-05-10 — TASK-004, TASK-005
+
+### TASK-004 — done
+- `PingService` теперь измеряет реальную TCP connect latency до host:port через nonblocking socket + timeout.
+- В sidebar добавлены действия `Ping All` и `Auto fastest`.
+- Рядом с профилями отображается latency/timeout/not checked, результаты сохраняются в profiles store.
+- `ProfileStore` умеет параллельно обновлять ping всех профилей и выбирать самый быстрый успешный профиль.
+- Добавлены тесты выбора fastest профиля.
+
+### TASK-005 — done
+- Routing расширен до presets: Proxy all, Direct RU/SU, Direct selected, Bypass LAN, Custom.
+- В Settings → Routing добавлены отдельные группы Direct / Proxy / Block domains, preview правил, быстрые presets и pending changes indicator.
+- Добавлены Export JSON / Import from Clipboard для routing settings.
+- `SingBoxConfigGenerator` теперь генерирует route rules для direct, proxy-out, block и LAN bypass.
+- `Apply & Reconnect` применяет текущие routing-настройки к активному подключению через reconnect flow.
+- Добавлены тесты JSON round-trip и генерации proxy/block rules.
+
+### Проверки
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter RoutingSettingsTests` — passed, 4 tests.
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` — passed, 22 tests.
+- `./script/build_and_run.sh --verify` — passed.
+- `/Users/rootix/Applications/porkn.app` пересобран и заменён из `dist/porkn.app`.
+- `codesign --verify --deep --strict /Users/rootix/Applications/porkn.app` — passed.
+- `scutil --proxy` после установки показывает только `FTPPassive : 1`, system proxy от porkn не остался включённым.

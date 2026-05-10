@@ -1,9 +1,27 @@
 import Foundation
 
 struct RoutingSettings: Codable, Equatable {
+  static let presetStorageKey = "routing.preset"
   static let directDomainsStorageKey = "routing.directDomains"
+  static let proxyDomainsStorageKey = "routing.proxyDomains"
+  static let blockDomainsStorageKey = "routing.blockDomains"
 
+  var preset: RoutingPreset
   var directDomainsText: String
+  var proxyDomainsText: String
+  var blockDomainsText: String
+
+  init(
+    preset: RoutingPreset = .directSelected,
+    directDomainsText: String = Self.defaultDirectDomainsText,
+    proxyDomainsText: String = "",
+    blockDomainsText: String = ""
+  ) {
+    self.preset = preset
+    self.directDomainsText = directDomainsText
+    self.proxyDomainsText = proxyDomainsText
+    self.blockDomainsText = blockDomainsText
+  }
 
   static let defaultDirectDomainsText = """
     *.ru
@@ -11,15 +29,73 @@ struct RoutingSettings: Codable, Equatable {
     """
 
   static var current: RoutingSettings {
-    let stored = UserDefaults.standard.string(forKey: directDomainsStorageKey)
-    return RoutingSettings(directDomainsText: stored ?? defaultDirectDomainsText)
+    let presetRaw = UserDefaults.standard.string(forKey: presetStorageKey)
+    let preset = RoutingPreset(rawValue: presetRaw ?? "") ?? .directRuSu
+    let storedDirect = UserDefaults.standard.string(forKey: directDomainsStorageKey)
+    let storedProxy = UserDefaults.standard.string(forKey: proxyDomainsStorageKey)
+    let storedBlock = UserDefaults.standard.string(forKey: blockDomainsStorageKey)
+    return RoutingSettings(
+      preset: preset,
+      directDomainsText: storedDirect ?? defaultDirectDomainsText,
+      proxyDomainsText: storedProxy ?? "",
+      blockDomainsText: storedBlock ?? ""
+    )
+  }
+
+  var routeRules: [[String: Any]] {
+    var rules: [[String: Any]] = []
+
+    if preset == .bypassLan || preset == .directRuSu || preset == .directSelected
+      || preset == .custom
+    {
+      if preset == .bypassLan {
+        rules.append(["ip_is_private": true, "outbound": "direct"])
+      }
+    }
+
+    if let block = domainRule(text: blockDomainsText, outbound: "block") {
+      rules.append(block)
+    }
+    if let direct = domainRule(text: effectiveDirectDomainsText, outbound: "direct") {
+      rules.append(direct)
+    }
+    if let proxy = domainRule(text: proxyDomainsText, outbound: "proxy-out") {
+      rules.append(proxy)
+    }
+
+    return rules
   }
 
   var directDomainRule: [String: Any]? {
-    let parsed = DomainRuleParser.parse(directDomainsText)
+    domainRule(text: effectiveDirectDomainsText, outbound: "direct")
+  }
+
+  var effectiveDirectDomainsText: String {
+    switch preset {
+    case .proxyAll:
+      ""
+    case .directRuSu:
+      Self.defaultDirectDomainsText
+    case .directSelected, .custom, .bypassLan:
+      directDomainsText
+    }
+  }
+
+  func exportJSONString() throws -> String {
+    let data = try JSONEncoder.routing.encode(self)
+    return String(data: data, encoding: .utf8) ?? "{}"
+  }
+
+  static func importJSONString(_ text: String) throws -> RoutingSettings {
+    let data = Data(text.utf8)
+    return try JSONDecoder.routing.decode(RoutingSettings.self, from: data)
+  }
+
+  private func domainRule(text: String, outbound: String) -> [String: Any]? {
+    let parsed = DomainRuleParser.parse(text)
     guard !parsed.domainSuffix.isEmpty || !parsed.domain.isEmpty else { return nil }
 
-    var rule: [String: Any] = ["outbound": "direct"]
+    var rule: [String: Any] = ["outbound": outbound]
     if !parsed.domainSuffix.isEmpty {
       rule["domain_suffix"] = parsed.domainSuffix
     }
@@ -27,6 +103,36 @@ struct RoutingSettings: Codable, Equatable {
       rule["domain"] = parsed.domain
     }
     return rule
+  }
+}
+
+enum RoutingPreset: String, Codable, CaseIterable, Identifiable {
+  case proxyAll
+  case directRuSu
+  case directSelected
+  case bypassLan
+  case custom
+
+  var id: String { rawValue }
+
+  var title: String {
+    switch self {
+    case .proxyAll: "Proxy all"
+    case .directRuSu: "Direct RU/SU"
+    case .directSelected: "Direct selected"
+    case .bypassLan: "Bypass LAN"
+    case .custom: "Custom"
+    }
+  }
+
+  var detail: String {
+    switch self {
+    case .proxyAll: "Весь трафик идёт через proxy-out, кроме служебных правил sing-box."
+    case .directRuSu: "*.ru и *.su идут напрямую, остальное через proxy."
+    case .directSelected: "Direct domains идут напрямую, proxy/block группы применяются отдельно."
+    case .bypassLan: "Локальные/private IP идут напрямую плюс пользовательские direct domains."
+    case .custom: "Полный ручной контроль direct/proxy/block domain groups."
+    }
   }
 }
 
@@ -105,4 +211,16 @@ private struct OrderedUniqueStrings {
     seen.insert(value)
     values.append(value)
   }
+}
+
+extension JSONEncoder {
+  fileprivate static var routing: JSONEncoder {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    return encoder
+  }
+}
+
+extension JSONDecoder {
+  fileprivate static var routing: JSONDecoder { JSONDecoder() }
 }
