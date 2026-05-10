@@ -1,0 +1,26 @@
+import XCTest
+
+@testable import porkn
+
+final class RoutingSettingsTests: XCTestCase {
+  func testParsesDirectDomainsAsSuffixRules() {
+    let parsed = DomainRuleParser.parse("*.ru, .su\nx.com https://twitter.com/path example.org:443")
+
+    XCTAssertEqual(parsed.domainSuffix, ["ru", "su", "x.com", "twitter.com", "example.org"])
+    XCTAssertEqual(parsed.domain, [])
+  }
+
+  func testGeneratorAddsDirectDomainRule() throws {
+    let profile = try ConfigParser().parseOne(
+      "vless://uuid@example.com:443?security=reality&type=tcp&sni=example.com&fp=chrome&pbk=public&sid=short#VLESS"
+    )
+    let settings = RoutingSettings(directDomainsText: "*.ru\nx.com")
+    let json = try SingBoxConfigGenerator().generate(
+      profile: profile, mode: .localProxy, routingSettings: settings)
+
+    XCTAssertTrue(json.contains("\"domain_suffix\" : ["))
+    XCTAssertTrue(json.contains("\"ru\""))
+    XCTAssertTrue(json.contains("\"x.com\""))
+    XCTAssertTrue(json.contains("\"outbound\" : \"direct\""))
+  }
+}
