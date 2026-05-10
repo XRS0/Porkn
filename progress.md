@@ -22,3 +22,23 @@
 - `./script/build_and_run.sh --verify` — passed.
 - `scutil --proxy` после verify показывает только `FTPPassive : 1`, system proxy не остался включённым.
 
+## 2026-05-10 — TASK-002, TASK-003
+
+### TASK-002 — done
+- Добавлено состояние `ConnectionState.switching(from:to)` и busy flag `isTransitioning`.
+- `TunnelController.switchTo` теперь выполняет safe reconnect flow: показывает Switching, останавливает старый runtime, восстанавливает proxy, затем запускает новый runtime.
+- Добавлен transition token, чтобы старые/параллельные операции не перетирали новое состояние.
+- Старый `onExit` sing-box по-прежнему игнорируется через `activeRunID`.
+- Добавлен тест `ConnectionStateTests`.
+
+### TASK-003 — done
+- Добавлены `ProxyHealthStatus` и `ProxyHealthCheckService`.
+- После успешного local proxy connect запускается health check: local listener check + HTTP(S) IP request через proxy.
+- UI показывает health card: Not checked, Checking, Protected, Proxy reachable, Remote check failed, Local proxy failed.
+- В логах отображается итог health check.
+- Добавлены тесты `ProxyHealthCheckServiceTests`.
+
+### Проверки
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` — passed, 19 tests.
+- `./script/build_and_run.sh --verify` — pending in final verification step after this progress entry.
+
