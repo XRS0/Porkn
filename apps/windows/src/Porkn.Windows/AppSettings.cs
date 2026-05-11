@@ -105,21 +105,25 @@ internal static class SettingTitles
         _ => language.ToString()
     };
 
-    public static string Title(this ProfileSortMode mode) => mode switch
+    public static string Title(this ProfileSortMode mode) => mode.Title(AppLanguage.En);
+
+    public static string Title(this ProfileSortMode mode, AppLanguage language) => mode switch
     {
-        ProfileSortMode.FavoritesFirst => "Favorites first",
-        ProfileSortMode.FastestFirst => "Fastest first",
-        ProfileSortMode.Name => "Name",
-        ProfileSortMode.RecentlyUsed => "Recently used",
+        ProfileSortMode.FavoritesFirst => L10n.Text(language, "Сначала избранные", "Favorites first"),
+        ProfileSortMode.FastestFirst => L10n.Text(language, "Сначала быстрые", "Fastest first"),
+        ProfileSortMode.Name => L10n.Text(language, "По имени", "Name"),
+        ProfileSortMode.RecentlyUsed => L10n.Text(language, "Недавно использованные", "Recently used"),
         _ => mode.ToString()
     };
 
-    public static string Title(this SubscriptionAutoRefreshInterval interval) => interval switch
+    public static string Title(this SubscriptionAutoRefreshInterval interval) => interval.Title(AppLanguage.En);
+
+    public static string Title(this SubscriptionAutoRefreshInterval interval, AppLanguage language) => interval switch
     {
-        SubscriptionAutoRefreshInterval.Off => "Off",
-        SubscriptionAutoRefreshInterval.SixHours => "Every 6 hours",
-        SubscriptionAutoRefreshInterval.TwelveHours => "Every 12 hours",
-        SubscriptionAutoRefreshInterval.Daily => "Daily",
+        SubscriptionAutoRefreshInterval.Off => L10n.Text(language, "Выключено", "Off"),
+        SubscriptionAutoRefreshInterval.SixHours => L10n.Text(language, "Каждые 6 часов", "Every 6 hours"),
+        SubscriptionAutoRefreshInterval.TwelveHours => L10n.Text(language, "Каждые 12 часов", "Every 12 hours"),
+        SubscriptionAutoRefreshInterval.Daily => L10n.Text(language, "Ежедневно", "Daily"),
         _ => interval.ToString()
     };
 
@@ -132,23 +136,27 @@ internal static class SettingTitles
         _ => null
     };
 
-    public static string Title(this RoutingPreset preset) => preset switch
+    public static string Title(this RoutingPreset preset) => preset.Title(AppLanguage.En);
+
+    public static string Title(this RoutingPreset preset, AppLanguage language) => preset switch
     {
-        RoutingPreset.ProxyAll => "Proxy all",
-        RoutingPreset.DirectRuSu => "Direct RU/SU",
-        RoutingPreset.DirectSelected => "Direct selected",
-        RoutingPreset.BypassLan => "Bypass LAN",
-        RoutingPreset.Custom => "Custom",
+        RoutingPreset.ProxyAll => L10n.Text(language, "Проксировать всё", "Proxy all"),
+        RoutingPreset.DirectRuSu => L10n.Text(language, "Напрямую RU/SU", "Direct RU/SU"),
+        RoutingPreset.DirectSelected => L10n.Text(language, "Выбранные напрямую", "Direct selected"),
+        RoutingPreset.BypassLan => L10n.Text(language, "Обход LAN", "Bypass LAN"),
+        RoutingPreset.Custom => L10n.Text(language, "Вручную", "Custom"),
         _ => preset.ToString()
     };
 
-    public static string Detail(this RoutingPreset preset) => preset switch
+    public static string Detail(this RoutingPreset preset) => preset.Detail(AppLanguage.En);
+
+    public static string Detail(this RoutingPreset preset, AppLanguage language) => preset switch
     {
-        RoutingPreset.ProxyAll => "Весь трафик идёт через proxy-out, кроме служебных правил sing-box.",
-        RoutingPreset.DirectRuSu => "*.ru и *.su идут напрямую, остальное через proxy.",
-        RoutingPreset.DirectSelected => "Direct domains идут напрямую, proxy/block группы применяются отдельно.",
-        RoutingPreset.BypassLan => "Локальные/private IP идут напрямую плюс пользовательские direct domains.",
-        RoutingPreset.Custom => "Полный ручной контроль direct/proxy/block domain groups.",
+        RoutingPreset.ProxyAll => L10n.Text(language, "Весь трафик идёт через proxy-out, кроме служебных правил sing-box.", "All traffic goes through proxy-out except sing-box service rules."),
+        RoutingPreset.DirectRuSu => L10n.Text(language, "*.ru и *.su идут напрямую, остальное через proxy.", "*.ru and *.su go direct; everything else goes through proxy."),
+        RoutingPreset.DirectSelected => L10n.Text(language, "Direct-домены идут напрямую, proxy/block группы применяются отдельно.", "Direct domains go directly; proxy/block groups are applied separately."),
+        RoutingPreset.BypassLan => L10n.Text(language, "Локальные/private IP идут напрямую плюс пользовательские direct-домены.", "Local/private IP ranges go direct plus custom direct domains."),
+        RoutingPreset.Custom => L10n.Text(language, "Полный ручной контроль direct/proxy/block групп доменов.", "Full manual control over direct/proxy/block domain groups."),
         _ => ""
     };
 }

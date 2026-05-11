@@ -54,7 +54,7 @@ internal sealed class MainWindow : Window
     private bool _isBusy;
     private bool _manualStopInProgress;
     private int _localProxyPort = PortGuard.DefaultPort;
-    private string _lastLogLine = "Ready. Import a subscription/profile or select an existing server.";
+    private string _lastLogLine = "";
 
     private AppSettings Settings => _settingsStore.Settings;
 
@@ -68,6 +68,7 @@ internal sealed class MainWindow : Window
         Background = Ui.WindowBackground;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         TrySetIcon();
+        _lastLogLine = T("Готово. Импортируй подписку/профиль или выбери сервер.", "Ready. Import a subscription/profile or select an existing server.");
 
         _selectedProfile = ResolveInitialProfile();
         Content = BuildRoot();
@@ -180,7 +181,7 @@ internal sealed class MainWindow : Window
 
         var title = new StackPanel { Spacing = 0, VerticalAlignment = VerticalAlignment.Center };
         title.Children.Add(Text("porkn", 20, FontWeight.Bold));
-        title.Children.Add(Text("Windows System Proxy", 12, FontWeight.Normal, Ui.SecondaryText));
+        title.Children.Add(Text(T("Системный proxy Windows", "Windows System Proxy"), 12, FontWeight.Normal, Ui.SecondaryText));
 
         return new StackPanel
         {
@@ -206,7 +207,7 @@ internal sealed class MainWindow : Window
 
     private Control BuildSearchCard()
     {
-        _searchText.Watermark = "Search name, host, protocol…";
+        _searchText.Watermark = T("Поиск по имени, хосту, протоколу…", "Search name, host, protocol…");
         _searchText.TextChanged += (_, _) => RefreshProfilesPanel();
         StyleTextBox(_searchText);
         return Card(_searchText, background: Ui.InputBackground, padding: new Thickness(14, 11), radius: 18, margin: new Thickness(0, 0, 0, 18));
@@ -214,20 +215,20 @@ internal sealed class MainWindow : Window
 
     private Control BuildImportCard()
     {
-        _importText.Watermark = "Paste subscription URL / VLESS / SOCKS / Trojan…";
+        _importText.Watermark = T("Вставь subscription URL / VLESS / SOCKS / Trojan…", "Paste subscription URL / VLESS / SOCKS / Trojan…");
         _importText.AcceptsReturn = false;
         _importText.TextWrapping = TextWrapping.NoWrap;
         _importText.MinHeight = 42;
         _importText.MaxHeight = 42;
         StyleTextBox(_importText);
 
-        var import = SecondaryButton("Import");
+        var import = SecondaryButton(T("Импорт", "Import"));
         import.Click += async (_, _) => await ImportProfilesAsync();
-        var pbk = SecondaryButton("PBK VPN");
+        var pbk = SecondaryButton(T("PBK VPN", "PBK VPN"));
         pbk.Click += async (_, _) => await ImportPbkAsync();
-        var socks = SecondaryButton("SOCKS");
+        var socks = SecondaryButton(T("SOCKS", "SOCKS"));
         socks.Click += async (_, _) => await ShowSocksDialogAsync();
-        var delete = SecondaryButton("Delete", Ui.Red);
+        var delete = SecondaryButton(T("Удалить", "Delete"), Ui.Red);
         delete.Click += (_, _) => DeleteSelectedProfile();
 
         var actionGrid = new Grid
@@ -253,8 +254,8 @@ internal sealed class MainWindow : Window
             ColumnDefinitions = new ColumnDefinitions("*,Auto"),
             Children =
             {
-                Text("Import", 12, FontWeight.Bold, Ui.SecondaryText),
-                WithColumn(Text($"{_store.Subscriptions.Count} subscriptions", 11, FontWeight.Normal, Ui.TertiaryText), 1)
+                Text(T("Импорт", "Import"), 12, FontWeight.Bold, Ui.SecondaryText),
+                WithColumn(Text(T($"{_store.Subscriptions.Count} подписок", $"{_store.Subscriptions.Count} subscriptions"), 11, FontWeight.Normal, Ui.TertiaryText), 1)
             }
         });
         stack.Children.Add(Card(_importText, background: Ui.InputBackground, padding: new Thickness(0), radius: 14));
@@ -265,11 +266,11 @@ internal sealed class MainWindow : Window
     private Control BuildImportActions()
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), Margin = new Thickness(0, 0, 0, 16) };
-        var import = SecondaryButton("Import");
+        var import = SecondaryButton(T("Импорт", "Import"));
         import.Click += async (_, _) => await ImportProfilesAsync();
-        var socks = SecondaryButton("SOCKS");
+        var socks = SecondaryButton(T("SOCKS", "SOCKS"));
         socks.Click += async (_, _) => await ShowSocksDialogAsync();
-        var delete = SecondaryButton("Delete", Ui.Red);
+        var delete = SecondaryButton(T("Удалить", "Delete"), Ui.Red);
         delete.Click += (_, _) => DeleteSelectedProfile();
         grid.Children.Add(import);
         Grid.SetColumn(socks, 1);
@@ -284,7 +285,7 @@ internal sealed class MainWindow : Window
     private Control BuildSubscriptionsSection()
     {
         var stack = new StackPanel { Spacing = 8, Margin = new Thickness(0, 0, 0, 14) };
-        stack.Children.Add(SectionLabel("Подписки"));
+        stack.Children.Add(SectionLabel(T("Подписки", "Subscriptions")));
         stack.Children.Add(new ScrollViewer
         {
             Content = _subscriptionsPanel,
@@ -296,13 +297,13 @@ internal sealed class MainWindow : Window
 
     private Control BuildProfileActions()
     {
-        _favoritesOnly.Content = "Favorites";
+        _favoritesOnly.Content = T("Избранные", "Favorites");
         _favoritesOnly.Foreground = Ui.SecondaryText;
         _favoritesOnly.IsChecked = Settings.FavoritesOnly;
         _favoritesOnly.Checked += (_, _) => { Settings.FavoritesOnly = true; _settingsStore.Save(); RefreshProfilesPanel(); };
         _favoritesOnly.Unchecked += (_, _) => { Settings.FavoritesOnly = false; _settingsStore.Save(); RefreshProfilesPanel(); };
 
-        _sortMode.ItemsSource = Enum.GetValues<ProfileSortMode>().Select(mode => mode.Title()).ToList();
+        _sortMode.ItemsSource = Enum.GetValues<ProfileSortMode>().Select(mode => mode.Title(Settings.Language)).ToList();
         _sortMode.SelectedIndex = (int)Settings.ProfileSortMode;
         StyleComboBox(_sortMode);
         _sortMode.SelectionChanged += (_, _) =>
@@ -315,9 +316,9 @@ internal sealed class MainWindow : Window
             }
         };
 
-        var pingAll = SecondaryButton("Ping All");
+        var pingAll = SecondaryButton(T("Проверить все", "Ping All"));
         pingAll.Click += async (_, _) => await PingAllAsync();
-        var fastest = SecondaryButton("Auto fastest");
+        var fastest = SecondaryButton(T("Самый быстрый", "Auto fastest"));
         fastest.Click += (_, _) => SelectFastestProfile();
 
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Margin = new Thickness(0, 0, 0, 10) };
@@ -333,7 +334,7 @@ internal sealed class MainWindow : Window
         filters.Children.Add(_sortMode);
 
         var stack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 0, 0, 10) };
-        stack.Children.Add(SectionLabel("Профили"));
+        stack.Children.Add(SectionLabel(T("Профили", "Profiles")));
         stack.Children.Add(top);
         stack.Children.Add(filters);
         return stack;
@@ -341,7 +342,7 @@ internal sealed class MainWindow : Window
 
     private Control BuildSidebarFooter()
     {
-        var settings = SecondaryButton("Settings");
+        var settings = SecondaryButton(T("Настройки", "Settings"));
         settings.HorizontalAlignment = HorizontalAlignment.Stretch;
         settings.Click += (_, _) =>
         {
@@ -350,10 +351,10 @@ internal sealed class MainWindow : Window
         };
 
         var mode = new StackPanel { Spacing = 2 };
-        mode.Children.Add(Text("System Proxy mode", 12, FontWeight.SemiBold));
+        mode.Children.Add(Text(T("Режим System Proxy", "System Proxy mode"), 12, FontWeight.SemiBold));
         mode.Children.Add(Text($"{LocalProxyHost}:{_localProxyPort} · sing-box", 11, FontWeight.Normal, Ui.SecondaryText, monospace: true));
 
-        var subscriptionSummary = _store.LastRefreshSummary?.ShortText ?? $"{_store.Subscriptions.Count} subscription URL";
+        var subscriptionSummary = _store.LastRefreshSummary is not null ? RefreshSummaryText(_store.LastRefreshSummary) : T($"{_store.Subscriptions.Count} URL подписок", $"{_store.Subscriptions.Count} subscription URL(s)");
 
         var stack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 16, 0, 4) };
         stack.Children.Add(settings);
@@ -362,7 +363,7 @@ internal sealed class MainWindow : Window
             Spacing = 4,
             Children =
             {
-                Text("Subscriptions", 11, FontWeight.Bold, Ui.SecondaryText),
+                Text(T("Подписки", "Subscriptions"), 11, FontWeight.Bold, Ui.SecondaryText),
                 Text(subscriptionSummary, 11, FontWeight.Normal, Ui.TertiaryText)
             }
         }, Ui.SubtleCardBackground, padding: new Thickness(14, 12), radius: 16));
@@ -382,7 +383,7 @@ internal sealed class MainWindow : Window
         _subscriptionsPanel.Children.Clear();
         if (_store.Subscriptions.Count == 0)
         {
-            _subscriptionsPanel.Children.Add(Text("Нет subscription URL", 11, FontWeight.Normal, Ui.SecondaryText));
+            _subscriptionsPanel.Children.Add(Text(T("Нет subscription URL", "No subscription URL"), 11, FontWeight.Normal, Ui.SecondaryText));
             return;
         }
 
@@ -393,7 +394,7 @@ internal sealed class MainWindow : Window
 
         if (_store.LastRefreshSummary is not null)
         {
-            _subscriptionsPanel.Children.Add(Text(_store.LastRefreshSummary.ShortText, 11, FontWeight.SemiBold, Ui.Green));
+            _subscriptionsPanel.Children.Add(Text(RefreshSummaryText(_store.LastRefreshSummary), 11, FontWeight.SemiBold, Ui.Green));
         }
     }
 
@@ -404,7 +405,7 @@ internal sealed class MainWindow : Window
         var info = new StackPanel { Spacing = 2, Children = { name, host } };
         if (subscription.LastRefreshAt is not null)
         {
-            info.Children.Add(Text($"Last refresh: {subscription.LastRefreshAt.Value.LocalDateTime:g}", 10, FontWeight.Normal, Ui.TertiaryText));
+            info.Children.Add(Text(T($"Последнее обновление: {subscription.LastRefreshAt.Value.LocalDateTime:g}", $"Last refresh: {subscription.LastRefreshAt.Value.LocalDateTime:g}"), 10, FontWeight.Normal, Ui.TertiaryText));
         }
 
         var refresh = TinyButton("↻");
@@ -435,8 +436,8 @@ internal sealed class MainWindow : Window
                 Spacing = 8,
                 Children =
                 {
-                    Text("Нет конфигов", 13, FontWeight.SemiBold),
-                    Text("Импортируй subscription URL, VLESS, VMess, Trojan, SS или SOCKS.", 11, FontWeight.Normal, Ui.SecondaryText)
+                    Text(T("Нет конфигов", "No configs"), 13, FontWeight.SemiBold),
+                    Text(T("Импортируй subscription URL, VLESS, VMess, Trojan, SS или SOCKS.", "Import a subscription URL, VLESS, VMess, Trojan, SS or SOCKS."), 11, FontWeight.Normal, Ui.SecondaryText)
                 }
             }, padding: new Thickness(12), radius: 16));
             return;
@@ -478,12 +479,12 @@ internal sealed class MainWindow : Window
         title.Children.Add(Text(profile.Name, 13, FontWeight.SemiBold));
         if (connected)
         {
-            title.Children.Add(Pill("Connected", Ui.Green, Ui.GreenSoft));
+            title.Children.Add(Pill(T("Подключено", "Connected"), Ui.Green, Ui.GreenSoft));
         }
 
         var details = Text($"{profile.Protocol.ToUpperInvariant()} · {profile.Endpoint}", 11, FontWeight.Normal, accent, monospace: false);
         details.TextTrimming = TextTrimming.CharacterEllipsis;
-        var meta = Text($"{FormatLatency(profile.LastPingMilliseconds)} · {_store.SubscriptionNameFor(profile)}", 10, FontWeight.Normal, Ui.TertiaryText);
+        var meta = Text($"{FormatLatency(profile.LastPingMilliseconds)} · {ProfileSourceName(profile)}", 10, FontWeight.Normal, Ui.TertiaryText);
 
         var textStack = new StackPanel { Spacing = 3, Margin = new Thickness(12, 0, 0, 0), Children = { title, details, meta } };
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
@@ -566,7 +567,7 @@ internal sealed class MainWindow : Window
 
     private Control BuildDetailHeader()
     {
-        var title = _isBusy ? (_isConnected ? "Switching" : "Connecting") : _isConnected ? HealthStatusTitle() : "Off";
+        var title = _isBusy ? (_isConnected ? T("Переключение", "Switching") : T("Подключение", "Connecting")) : _isConnected ? HealthStatusTitle() : T("Выключено", "Off");
         var color = _isBusy ? Ui.Blue : _isConnected ? HealthStatusColor() : Ui.PrimaryText;
         return new StackPanel
         {
@@ -580,13 +581,13 @@ internal sealed class MainWindow : Window
     }
 
     private string HealthStatusTitle() => _activeProfile?.IsRasProfile() == true && _isConnected
-        ? "VPN connected"
+        ? T("VPN подключён", "VPN connected")
         : _healthStatus.Kind switch
     {
-        ProxyHealthKind.Protected or ProxyHealthKind.ProxyReachable => "Protected",
-        ProxyHealthKind.Checking => "Checking protection",
-        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => "Connected with warning",
-        _ => "Connected"
+        ProxyHealthKind.Protected or ProxyHealthKind.ProxyReachable => T("Защищено", "Protected"),
+        ProxyHealthKind.Checking => T("Проверка защиты", "Checking protection"),
+        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => T("Подключено с предупреждением", "Connected with warning"),
+        _ => T("Подключено", "Connected")
     };
 
     private IBrush HealthStatusColor() => _healthStatus.Kind switch
@@ -610,7 +611,7 @@ internal sealed class MainWindow : Window
         Grid.SetColumn(badge, 1);
         top.Children.Add(badge);
 
-        var action = PrimaryButton(connectedToThis ? "Отключить" : _isConnected ? "Переключиться" : "Подключить", connectedToThis ? Ui.Green : Ui.Blue);
+        var action = PrimaryButton(connectedToThis ? T("Отключить", "Disconnect") : _isConnected ? T("Переключиться", "Switch") : T("Подключить", "Connect"), connectedToThis ? Ui.Green : Ui.Blue);
         action.IsEnabled = !_isBusy;
         action.Click += async (_, _) =>
         {
@@ -618,10 +619,10 @@ internal sealed class MainWindow : Window
             else await ConnectProfileAsync(profile, isSwitch: _isConnected);
         };
 
-        var favorite = SecondaryButton(profile.IsFavorite ? "★ Убрать из Favorites" : "☆ Добавить в Favorites");
+        var favorite = SecondaryButton(profile.IsFavorite ? T("★ Убрать из избранного", "★ Remove from Favorites") : T("☆ Добавить в избранное", "☆ Add to Favorites"));
         favorite.Click += (_, _) => { _store.ToggleFavorite(profile); RefreshAll(); };
 
-        var delete = SecondaryButton("Удалить", Ui.Red);
+        var delete = SecondaryButton(T("Удалить", "Delete"), Ui.Red);
         delete.Click += (_, _) => DeleteSelectedProfile();
 
         var buttonRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
@@ -645,11 +646,31 @@ internal sealed class MainWindow : Window
         if (ProfileKinds.IsRasProfile(profile))
         {
             var phonebook = profile.Query.GetValueOrDefault("phonebook_path", "managed rasphone.pbk");
-            return connectedToThis ? $"Windows RAS VPN · {phonebook}" : "Windows RAS VPN scenario";
+            return connectedToThis ? $"Windows RAS VPN · {phonebook}" : T("Сценарий Windows RAS VPN", "Windows RAS VPN scenario");
         }
 
-        return connectedToThis ? $"Local proxy: {LocalProxyHost}:{_localProxyPort}" : "System Proxy scenario";
+        return connectedToThis ? T($"Локальный proxy: {LocalProxyHost}:{_localProxyPort}", $"Local proxy: {LocalProxyHost}:{_localProxyPort}") : T("Сценарий System Proxy", "System Proxy scenario");
     }
+
+    private string HealthStatusDisplayTitle() => _healthStatus.Kind switch
+    {
+        ProxyHealthKind.Protected => _activeProfile?.IsRasProfile() == true ? T("VPN подключён", "VPN connected") : T("Защищено", "Protected"),
+        ProxyHealthKind.ProxyReachable => T("Proxy доступен", "Proxy reachable"),
+        ProxyHealthKind.Checking => T("Проверка", "Checking"),
+        ProxyHealthKind.RemoteCheckFailed => T("Удалённая проверка не удалась", "Remote check failed"),
+        ProxyHealthKind.LocalProxyFailed => T("Локальный proxy недоступен", "Local proxy failed"),
+        _ => T("Не проверено", "Not checked")
+    };
+
+    private string HealthStatusDisplayDetail() => _healthStatus.Kind switch
+    {
+        ProxyHealthKind.Protected when _activeProfile?.IsRasProfile() == true => T($"Windows RAS VPN entry подключён: {_activeProfile.Name}", $"Windows RAS VPN entry is connected: {_activeProfile.Name}"),
+        ProxyHealthKind.Protected => T($"Proxy доступен. Remote IP: {ExtractRemoteIp(_healthStatus.Detail)}", $"Proxy is reachable. Remote IP: {ExtractRemoteIp(_healthStatus.Detail)}"),
+        ProxyHealthKind.ProxyReachable => T("Локальный proxy работает, remote IP check не вернул IP.", "Local proxy works, remote IP check returned no IP."),
+        ProxyHealthKind.Checking => T("Проверяем локальный proxy и удалённый маршрут…", "Verifying local proxy and remote path…"),
+        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => _healthStatus.Detail,
+        _ => T("Подключись, чтобы проверить маршрут.", "Connect to verify the route.")
+    };
 
     private Control BuildHealthRow()
     {
@@ -662,14 +683,14 @@ internal sealed class MainWindow : Window
             _ => Ui.SubtleBackground
         };
         var stack = new StackPanel { Spacing = 3 };
-        stack.Children.Add(Text(_healthStatus.Title, 13, FontWeight.SemiBold, color));
-        stack.Children.Add(Text(_healthStatus.Detail, 11, FontWeight.Normal, Ui.SecondaryText));
+        stack.Children.Add(Text(HealthStatusDisplayTitle(), 13, FontWeight.SemiBold, color));
+        stack.Children.Add(Text(HealthStatusDisplayDetail(), 11, FontWeight.Normal, Ui.SecondaryText));
         return Card(stack, background, padding: new Thickness(12), radius: 14);
     }
 
     private Control BuildMetadataCard(Profile profile)
     {
-        var ping = SecondaryButton("Проверить");
+        var ping = SecondaryButton(T("Проверить", "Check"));
         ping.Click += async (_, _) =>
         {
             var value = await _pingService.MeasureAsync(profile);
@@ -678,28 +699,28 @@ internal sealed class MainWindow : Window
         };
 
         var stack = new StackPanel { Spacing = 12 };
-        stack.Children.Add(Text("Параметры", 16, FontWeight.SemiBold));
-        stack.Children.Add(MetadataRow("Протокол", profile.Protocol.ToUpperInvariant()));
-        stack.Children.Add(MetadataRow(ProfileKinds.IsRasProfile(profile) ? "Entry" : "Сервер", profile.Endpoint, monospace: true));
+        stack.Children.Add(Text(T("Параметры", "Parameters"), 16, FontWeight.SemiBold));
+        stack.Children.Add(MetadataRow(T("Протокол", "Protocol"), profile.Protocol.ToUpperInvariant()));
+        stack.Children.Add(MetadataRow(ProfileKinds.IsRasProfile(profile) ? T("Entry", "Entry") : T("Сервер", "Server"), profile.Endpoint, monospace: true));
         if (ProfileKinds.IsRasProfile(profile))
         {
-            if (profile.Query.TryGetValue("phonebook_path", out var phonebookPath)) stack.Children.Add(MetadataRow("Phonebook", phonebookPath, monospace: true));
-            if (profile.Query.TryGetValue("device", out var device)) stack.Children.Add(MetadataRow("Device", device));
-            if (profile.Query.TryGetValue("vpn_strategy", out var strategy)) stack.Children.Add(MetadataRow("VPN strategy", strategy));
+            if (profile.Query.TryGetValue("phonebook_path", out var phonebookPath)) stack.Children.Add(MetadataRow(T("Phonebook", "Phonebook"), phonebookPath, monospace: true));
+            if (profile.Query.TryGetValue("device", out var device)) stack.Children.Add(MetadataRow(T("Устройство", "Device"), device));
+            if (profile.Query.TryGetValue("vpn_strategy", out var strategy)) stack.Children.Add(MetadataRow(T("Стратегия VPN", "VPN strategy"), strategy));
         }
         else
         {
-            stack.Children.Add(MetadataRow("Ping", FormatLatency(profile.LastPingMilliseconds), trailing: ping));
+            stack.Children.Add(MetadataRow(T("Ping", "Ping"), FormatLatency(profile.LastPingMilliseconds), trailing: ping));
         }
         if (profile.Query.TryGetValue("type", out var transport) || profile.Query.TryGetValue("net", out transport))
         {
-            stack.Children.Add(MetadataRow("Transport", transport));
+            stack.Children.Add(MetadataRow(T("Транспорт", "Transport"), transport));
         }
         if (profile.Query.TryGetValue("security", out var security) || profile.Query.TryGetValue("tls", out security))
         {
-            stack.Children.Add(MetadataRow("Security", security));
+            stack.Children.Add(MetadataRow(T("Безопасность", "Security"), security));
         }
-        stack.Children.Add(MetadataRow("Subscription", _store.SubscriptionNameFor(profile)));
+        stack.Children.Add(MetadataRow(T("Источник", "Source"), ProfileSourceName(profile)));
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(24), radius: 22);
     }
 
@@ -707,14 +728,14 @@ internal sealed class MainWindow : Window
     {
         var isRas = ProfileKinds.IsRasProfile(profile);
         var stack = new StackPanel { Spacing = 12 };
-        stack.Children.Add(Text("Сценарий подключения", 16, FontWeight.SemiBold));
-        stack.Children.Add(Pill(isRas ? "Windows RAS VPN" : "System Proxy", Ui.PrimaryText, Ui.SubtleBackground, new Thickness(12, 7)));
+        stack.Children.Add(Text(T("Сценарий подключения", "Connection scenario"), 16, FontWeight.SemiBold));
+        stack.Children.Add(Pill(isRas ? T("Windows RAS VPN", "Windows RAS VPN") : T("System Proxy", "System Proxy"), Ui.PrimaryText, Ui.SubtleBackground, new Thickness(12, 7)));
         stack.Children.Add(Text(isRas
-            ? "porkn imports entries from rasphone.pbk, keeps a managed copy in Application Support and connects through Windows rasdial.exe."
-            : "Windows production mode mirrors macOS System Proxy: bundled sing-box opens a local mixed proxy and porkn points Windows system proxy to it.", 12, FontWeight.Normal, Ui.SecondaryText));
+            ? T("porkn импортирует записи из rasphone.pbk, хранит управляемую копию в Application Support и подключает VPN через Windows rasdial.exe.", "porkn imports entries from rasphone.pbk, keeps a managed copy in Application Support and connects through Windows rasdial.exe.")
+            : T("Windows production-режим повторяет macOS System Proxy: встроенный sing-box открывает локальный mixed proxy, а porkn направляет Windows system proxy на него.", "Windows production mode mirrors macOS System Proxy: bundled sing-box opens a local mixed proxy and porkn points Windows system proxy to it."), 12, FontWeight.Normal, Ui.SecondaryText));
         stack.Children.Add(Text(isRas
-            ? "Credentials are not extracted from the phonebook. If Windows has saved credentials, rasdial can reuse them; otherwise Windows may require credentials for the entry."
-            : "Full VPN/TUN mode is planned, but it requires a separate Windows packet capture/TUN driver strategy.", 12, FontWeight.Normal, isRas ? Ui.SecondaryText : Ui.Warning));
+            ? T("Данные входа не извлекаются из phonebook. Если Windows уже сохранил credentials, rasdial сможет использовать их; иначе Windows может запросить данные для entry.", "Credentials are not extracted from the phonebook. If Windows has saved credentials, rasdial can reuse them; otherwise Windows may require credentials for the entry.")
+            : T("Full VPN/TUN режим запланирован, но для него нужна отдельная стратегия Windows packet capture/TUN driver.", "Full VPN/TUN mode is planned, but it requires a separate Windows packet capture/TUN driver strategy."), 12, FontWeight.Normal, isRas ? Ui.SecondaryText : Ui.Warning));
 
         var preview = new TextBox
         {
@@ -726,7 +747,7 @@ internal sealed class MainWindow : Window
             MaxHeight = 260
         };
         StyleTextBox(preview, readOnly: true);
-        stack.Children.Add(Text(isRas ? "Предпросмотр PBK entry" : "Предпросмотр sing-box JSON", 13, FontWeight.SemiBold));
+        stack.Children.Add(Text(isRas ? T("Предпросмотр PBK entry", "PBK entry preview") : T("Предпросмотр sing-box JSON", "sing-box JSON preview"), 13, FontWeight.SemiBold));
         stack.Children.Add(preview);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(24), radius: 22);
     }
@@ -741,7 +762,7 @@ internal sealed class MainWindow : Window
         }
         catch (Exception ex)
         {
-            return "// " + ex.Message;
+            return T("// Ошибка предпросмотра: ", "// Preview error: ") + ex.Message;
         }
     }
 
@@ -760,7 +781,7 @@ internal sealed class MainWindow : Window
         StyleTextBox(logText, readOnly: true);
         _logTextControl = logText;
         var stack = new StackPanel { Spacing = 12 };
-        stack.Children.Add(Text("Advanced Logs", 16, FontWeight.SemiBold));
+        stack.Children.Add(Text(T("Расширенные логи", "Advanced Logs"), 16, FontWeight.SemiBold));
         stack.Children.Add(logText);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(24), radius: 22);
     }
@@ -778,18 +799,18 @@ internal sealed class MainWindow : Window
         };
         StyleTextBox(raw, readOnly: true);
         var stack = new StackPanel { Spacing = 12 };
-        stack.Children.Add(Text("Исходный конфиг", 16, FontWeight.SemiBold));
+        stack.Children.Add(Text(T("Исходный конфиг", "Raw config"), 16, FontWeight.SemiBold));
         stack.Children.Add(raw);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(24), radius: 22);
     }
 
     private Control BuildEmptyStateCard()
     {
-        var import = PrimaryButton("Import Subscription", Ui.Blue);
+        var import = PrimaryButton(T("Импорт подписки", "Import Subscription"), Ui.Blue);
         import.Click += async (_, _) => await ImportProfilesAsync();
-        var pbk = SecondaryButton("Import PBK VPN");
+        var pbk = SecondaryButton(T("Импорт PBK VPN", "Import PBK VPN"));
         pbk.Click += async (_, _) => await ImportPbkAsync();
-        var socks = SecondaryButton("Add SOCKS");
+        var socks = SecondaryButton(T("Добавить SOCKS", "Add SOCKS"));
         socks.Click += async (_, _) => await ShowSocksDialogAsync();
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center, Children = { import, pbk, socks } };
         return Card(new StackPanel
@@ -798,8 +819,8 @@ internal sealed class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             Children =
             {
-                Text("Начни с импорта конфига", 22, FontWeight.SemiBold),
-                Text("Поддерживаются subscription URL, SOCKS proxy, VLESS/Xray-compatible, Trojan и VMess profiles.", 13, FontWeight.Normal, Ui.SecondaryText),
+                Text(T("Начни с импорта конфига", "Start by importing a config"), 22, FontWeight.SemiBold),
+                Text(T("Поддерживаются subscription URL, SOCKS proxy, VLESS/Xray-compatible, Trojan, VMess и PBK VPN профили.", "Subscription URLs, SOCKS proxy, VLESS/Xray-compatible, Trojan, VMess and PBK VPN profiles are supported."), 13, FontWeight.Normal, Ui.SecondaryText),
                 row
             }
         }, padding: new Thickness(28), radius: 24);
@@ -813,8 +834,8 @@ internal sealed class MainWindow : Window
             Spacing = 8,
             Children =
             {
-                Text("Settings", 38, FontWeight.SemiBold),
-                Text("Настройки porkn применяются при следующем подключении или через Apply & Reconnect.", 14, FontWeight.Normal, Ui.SecondaryText)
+                Text(T("Настройки", "Settings"), 38, FontWeight.SemiBold),
+                Text(T("Настройки porkn применяются при следующем подключении или через Apply & Reconnect.", "porkn settings are applied on next connection or through Apply & Reconnect."), 14, FontWeight.Normal, Ui.SecondaryText)
             }
         });
         stack.Children.Add(BuildSettingsTabs());
@@ -824,10 +845,10 @@ internal sealed class MainWindow : Window
 
     private Control BuildSettingsTabs()
     {
-        var general = SecondaryButton("Основные");
+        var general = SecondaryButton(T("Основные", "General"));
         general.Background = _settingsTab == SettingsTab.General ? Ui.BlueSoft : Ui.CardBackground;
         general.Click += (_, _) => { _settingsTab = SettingsTab.General; RefreshDetail(); };
-        var routing = SecondaryButton("Routing");
+        var routing = SecondaryButton(T("Маршрутизация", "Routing"));
         routing.Background = _settingsTab == SettingsTab.Routing ? Ui.BlueSoft : Ui.CardBackground;
         routing.Click += (_, _) => { _settingsTab = SettingsTab.Routing; RefreshDetail(); };
         routing.Margin = new Thickness(10, 0, 0, 0);
@@ -851,7 +872,7 @@ internal sealed class MainWindow : Window
         };
         stack.Children.Add(SettingsCard(T("Интерфейс", "Interface"), T("Язык приложения и локальные параметры отображения.", "Application language and local display preferences."), language));
 
-        var killSwitch = SettingCheckBox("Kill Switch", T("Если sing-box неожиданно завершится, сохранить Windows proxy на локальном endpoint.", "If sing-box exits unexpectedly, keep Windows proxy pointed at the local endpoint."), Settings.KillSwitchEnabled, value => Settings.KillSwitchEnabled = value);
+        var killSwitch = SettingCheckBox(T("Kill Switch", "Kill Switch"), T("Если sing-box неожиданно завершится, сохранить Windows proxy на локальном endpoint.", "If sing-box exits unexpectedly, keep Windows proxy pointed at the local endpoint."), Settings.KillSwitchEnabled, value => Settings.KillSwitchEnabled = value);
         stack.Children.Add(SettingsCard(T("Безопасность", "Security"), T("Proxy-level защита от прямого трафика при аварийном падении runtime.", "Proxy-level protection against direct traffic if runtime crashes."), killSwitch));
 
         var startup = new StackPanel { Spacing = 10 };
@@ -860,7 +881,7 @@ internal sealed class MainWindow : Window
         stack.Children.Add(SettingsCard(T("Запуск", "Startup"), T("Поведение приложения при старте Windows.", "Behavior when Windows starts and porkn opens."), startup));
 
         var subscriptions = new StackPanel { Spacing = 10 };
-        var autoRefresh = new ComboBox { ItemsSource = Enum.GetValues<SubscriptionAutoRefreshInterval>().Select(item => item.Title()).ToList(), SelectedIndex = (int)Settings.SubscriptionAutoRefreshInterval };
+        var autoRefresh = new ComboBox { ItemsSource = Enum.GetValues<SubscriptionAutoRefreshInterval>().Select(item => item.Title(Settings.Language)).ToList(), SelectedIndex = (int)Settings.SubscriptionAutoRefreshInterval };
         StyleComboBox(autoRefresh);
         autoRefresh.SelectionChanged += (_, _) =>
         {
@@ -875,7 +896,7 @@ internal sealed class MainWindow : Window
         stack.Children.Add(SettingsCard(T("Подписки", "Subscriptions"), T("Автообновление subscription URL.", "Subscription URL auto-refresh."), subscriptions));
 
         var update = new StackPanel { Spacing = 10 };
-        var checkUpdates = SecondaryButton("Check for Updates");
+        var checkUpdates = SecondaryButton(T("Проверить обновления", "Check for Updates"));
         checkUpdates.Click += async (_, _) => await CheckForUpdatesAsync(update);
         update.Children.Add(checkUpdates);
         stack.Children.Add(SettingsCard(T("Обновления", "Updates"), T("Проверка последнего GitHub Release.", "Check latest GitHub Release."), update));
@@ -894,50 +915,50 @@ internal sealed class MainWindow : Window
     private Control BuildRoutingSettings()
     {
         var stack = new StackPanel { Spacing = 16 };
-        var preset = new ComboBox { ItemsSource = Enum.GetValues<RoutingPreset>().Select(item => item.Title()).ToList(), SelectedIndex = (int)Settings.Routing.Preset };
+        var preset = new ComboBox { ItemsSource = Enum.GetValues<RoutingPreset>().Select(item => item.Title(Settings.Language)).ToList(), SelectedIndex = (int)Settings.Routing.Preset };
         StyleComboBox(preset);
-        var presetDetail = Text(Settings.Routing.Preset.Detail(), 12, FontWeight.Normal, Ui.SecondaryText);
+        var presetDetail = Text(Settings.Routing.Preset.Detail(Settings.Language), 12, FontWeight.Normal, Ui.SecondaryText);
         preset.SelectionChanged += (_, _) =>
         {
             if (preset.SelectedIndex >= 0)
             {
                 Settings.Routing.Preset = Enum.GetValues<RoutingPreset>()[preset.SelectedIndex];
                 _settingsStore.Save();
-                presetDetail.Text = Settings.Routing.Preset.Detail();
+                presetDetail.Text = Settings.Routing.Preset.Detail(Settings.Language);
                 RefreshDetail();
             }
         };
-        stack.Children.Add(SettingsCard("Routing preset", "Быстрый выбор базовой стратегии маршрутизации.", new StackPanel { Spacing = 8, Children = { preset, presetDetail } }));
+        stack.Children.Add(SettingsCard(T("Пресет маршрутизации", "Routing preset"), T("Быстрый выбор базовой стратегии маршрутизации.", "Quickly choose the base routing strategy."), new StackPanel { Spacing = 8, Children = { preset, presetDetail } }));
 
-        var direct = DomainEditor("Direct domains", "Идут напрямую в обход proxy", Settings.Routing.DirectDomainsText, value => Settings.Routing.DirectDomainsText = value);
-        var proxy = DomainEditor("Proxy domains", "Явно идут через proxy-out", Settings.Routing.ProxyDomainsText, value => Settings.Routing.ProxyDomainsText = value);
-        var block = DomainEditor("Block domains", "Блокируются outbound block", Settings.Routing.BlockDomainsText, value => Settings.Routing.BlockDomainsText = value);
-        stack.Children.Add(SettingsCard("Domain groups", "Direct, Proxy и Block правила генерируются в sing-box route rules.", new StackPanel { Spacing = 14, Children = { direct, proxy, block } }));
+        var direct = DomainEditor(T("Direct-домены", "Direct domains"), T("Идут напрямую в обход proxy", "Go directly bypassing proxy"), Settings.Routing.DirectDomainsText, value => Settings.Routing.DirectDomainsText = value);
+        var proxy = DomainEditor(T("Proxy-домены", "Proxy domains"), T("Явно идут через proxy-out", "Explicitly go through proxy-out"), Settings.Routing.ProxyDomainsText, value => Settings.Routing.ProxyDomainsText = value);
+        var block = DomainEditor(T("Block-домены", "Block domains"), T("Блокируются outbound block", "Blocked through the block outbound"), Settings.Routing.BlockDomainsText, value => Settings.Routing.BlockDomainsText = value);
+        stack.Children.Add(SettingsCard(T("Группы доменов", "Domain groups"), T("Direct, Proxy и Block правила генерируются в sing-box route rules.", "Direct, Proxy and Block rules are generated into sing-box route rules."), new StackPanel { Spacing = 14, Children = { direct, proxy, block } }));
 
         var presets = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*") };
         AddPresetButton(presets, 0, "RU/SU", () => { Settings.Routing.Preset = RoutingPreset.DirectRuSu; Settings.Routing.DirectDomainsText = DomainRuleParser.AppendDomains(Settings.Routing.DirectDomainsText, ["*.ru", "*.su"]); SaveSettingsAndRefresh(); });
-        AddPresetButton(presets, 1, "Products", () => { Settings.Routing.Preset = RoutingPreset.DirectSelected; Settings.Routing.DirectDomainsText = DomainRuleParser.AppendDomains(Settings.Routing.DirectDomainsText, ["x.com", "twitter.com", "instagram.com", "facebook.com", "youtube.com", "google.com"]); SaveSettingsAndRefresh(); });
-        AddPresetButton(presets, 2, "Bypass LAN", () => { Settings.Routing.Preset = RoutingPreset.BypassLan; SaveSettingsAndRefresh(); });
-        AddPresetButton(presets, 3, "Reset", () => { Settings.Routing = RoutingSettings.Default; SaveSettingsAndRefresh(); });
-        stack.Children.Add(SettingsCard("Быстрые пресеты", "Добавь частые правила одной кнопкой.", presets));
+        AddPresetButton(presets, 1, T("Продукты", "Products"), () => { Settings.Routing.Preset = RoutingPreset.DirectSelected; Settings.Routing.DirectDomainsText = DomainRuleParser.AppendDomains(Settings.Routing.DirectDomainsText, ["x.com", "twitter.com", "instagram.com", "facebook.com", "youtube.com", "google.com"]); SaveSettingsAndRefresh(); });
+        AddPresetButton(presets, 2, T("Обход LAN", "Bypass LAN"), () => { Settings.Routing.Preset = RoutingPreset.BypassLan; SaveSettingsAndRefresh(); });
+        AddPresetButton(presets, 3, T("Сброс", "Reset"), () => { Settings.Routing = RoutingSettings.Default; SaveSettingsAndRefresh(); });
+        stack.Children.Add(SettingsCard(T("Быстрые пресеты", "Quick presets"), T("Добавь частые правила одной кнопкой.", "Add common rules with one click."), presets));
 
         var io = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-        var copy = SecondaryButton("Copy JSON");
+        var copy = SecondaryButton(T("Копировать JSON", "Copy JSON"));
         copy.Click += async (_, _) => await CopyRoutingJsonAsync();
-        var import = SecondaryButton("Import from Clipboard");
+        var import = SecondaryButton(T("Импорт из буфера", "Import from Clipboard"));
         import.Click += async (_, _) => await ImportRoutingJsonAsync();
         io.Children.Add(copy);
         io.Children.Add(import);
-        stack.Children.Add(SettingsCard("Import / Export", "Перенос routing settings между устройствами через JSON.", io));
+        stack.Children.Add(SettingsCard(T("Импорт / Экспорт", "Import / Export"), T("Перенос routing settings между устройствами через JSON.", "Move routing settings between devices via JSON."), io));
 
-        var apply = PrimaryButton(_activeProfile is null ? "Apply on Next Connect" : "Apply & Reconnect", _activeProfile is null ? Ui.SecondaryText : Ui.Green);
+        var apply = PrimaryButton(_activeProfile is null ? T("Применить при следующем подключении", "Apply on Next Connect") : T("Применить и переподключить", "Apply & Reconnect"), _activeProfile is null ? Ui.SecondaryText : Ui.Green);
         apply.IsEnabled = _activeProfile is not null;
         apply.Click += async (_, _) =>
         {
             _settingsStore.Save();
             if (_activeProfile is not null) await ConnectProfileAsync(_activeProfile, isSwitch: true);
         };
-        stack.Children.Add(SettingsCard("Применить изменения", _activeProfile is null ? "Сейчас нет активного подключения. Новые правила применятся при следующем подключении." : $"Сейчас подключён {_activeProfile.Name}. Нажми кнопку, чтобы пересобрать sing-box config.", apply));
+        stack.Children.Add(SettingsCard(T("Применить изменения", "Apply changes"), _activeProfile is null ? T("Сейчас нет активного подключения. Новые правила применятся при следующем подключении.", "There is no active connection. New rules will apply on the next connection.") : T($"Сейчас подключён {_activeProfile.Name}. Нажми кнопку, чтобы пересобрать sing-box config.", $"Currently connected to {_activeProfile.Name}. Press the button to rebuild the sing-box config."), apply));
 
         var preview = new TextBox
         {
@@ -949,7 +970,7 @@ internal sealed class MainWindow : Window
             MinHeight = 160
         };
         StyleTextBox(preview, readOnly: true);
-        stack.Children.Add(SettingsCard("Предпросмотр правил", "Так porkn добавит routing в generated sing-box config.", preview));
+        stack.Children.Add(SettingsCard(T("Предпросмотр правил", "Rules preview"), T("Так porkn добавит routing в generated sing-box config.", "This is how porkn will add routing to the generated sing-box config."), preview));
         return stack;
     }
 
@@ -1009,12 +1030,12 @@ internal sealed class MainWindow : Window
             var result = await _store.ImportAsync(_importText.Text ?? "");
             _importText.Text = "";
             _selectedProfile ??= _store.Profiles.FirstOrDefault();
-            AppendLog(result.Message);
+            AppendLog(ImportMessage(result));
             RefreshAll();
         }
         catch (Exception ex)
         {
-            AppendLog("Import failed: " + ex.Message);
+            AppendLog(T("Импорт не удался: ", "Import failed: ") + ex.Message);
         }
     }
 
@@ -1024,11 +1045,11 @@ internal sealed class MainWindow : Window
         {
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
-                Title = "Import rasphone.pbk",
+                Title = T("Импорт rasphone.pbk", "Import rasphone.pbk"),
                 AllowMultiple = false,
                 FileTypeFilter =
                 [
-                    new FilePickerFileType("Windows phonebook") { Patterns = ["*.pbk"] },
+                    new FilePickerFileType(T("Phonebook Windows", "Windows phonebook")) { Patterns = ["*.pbk"] },
                     FilePickerFileTypes.All
                 ]
             });
@@ -1038,12 +1059,12 @@ internal sealed class MainWindow : Window
             var path = await ResolveLocalFilePathAsync(file);
             var result = _store.ImportRasPhonebook(path);
             _selectedProfile = _store.Profiles.LastOrDefault(profile => ProfileKinds.IsRasProfile(profile)) ?? _selectedProfile;
-            AppendLog($"Imported {result.ProfilesImported} Windows RAS VPN profile(s) from {file.Name}");
+            AppendLog(T($"Импортировано {result.ProfilesImported} Windows RAS VPN профилей из {file.Name}", $"Imported {result.ProfilesImported} Windows RAS VPN profile(s) from {file.Name}"));
             RefreshAll();
         }
         catch (Exception ex)
         {
-            AppendLog("PBK import failed: " + ex.Message);
+            AppendLog(T("Импорт PBK не удался: ", "PBK import failed: ") + ex.Message);
         }
     }
 
@@ -1064,23 +1085,23 @@ internal sealed class MainWindow : Window
         try
         {
             var summary = await _store.RefreshWithSummaryAsync(subscription);
-            AppendLog(summary.ShortText);
+            AppendLog(RefreshSummaryText(summary));
         }
         catch (Exception ex)
         {
-            AppendLog("Refresh failed: " + ex.Message);
+            AppendLog(T("Обновление не удалось: ", "Refresh failed: ") + ex.Message);
         }
         RefreshAll();
     }
 
     private async Task ShowSocksDialogAsync()
     {
-        var dialog = new AddSocksDialog();
+        var dialog = new AddSocksDialog(Settings.Language);
         var result = await dialog.ShowDialog<AddSocksResult?>(this);
         if (result is null) return;
         _store.AddManualSocks(result.Name, result.Host, result.Port, result.Username, result.Password);
         _selectedProfile = _store.Profiles.LastOrDefault();
-        AppendLog($"Added SOCKS profile: {result.Name}");
+        AppendLog(T($"Добавлен SOCKS профиль: {result.Name}", $"Added SOCKS profile: {result.Name}"));
         RefreshAll();
     }
 
@@ -1089,7 +1110,7 @@ internal sealed class MainWindow : Window
         if (_isBusy) return;
         _isBusy = true;
         _healthStatus = ProxyHealthStatus.Checking();
-        AppendLog($"Preparing {profile.Protocol.ToUpperInvariant()} config for {profile.Endpoint}");
+        AppendLog(T($"Подготавливаю {profile.Protocol.ToUpperInvariant()} config для {profile.Endpoint}", $"Preparing {profile.Protocol.ToUpperInvariant()} config for {profile.Endpoint}"));
         RefreshAll();
 
         try
@@ -1101,27 +1122,27 @@ internal sealed class MainWindow : Window
 
             if (ProfileKinds.IsRasProfile(profile))
             {
-                await _rasDial.ConnectAsync(profile, AppendLog);
+                await _rasDial.ConnectAsync(profile, AppendRuntimeLog);
                 _activeProfile = profile;
                 _selectedProfile = profile;
                 _isConnected = true;
                 _isBusy = false;
                 _store.MarkUsed(profile);
                 _healthStatus = ProxyHealthStatus.VpnConnected(profile.Name);
-                AppendLog($"Windows RAS VPN connected: {profile.Name}");
+                AppendLog(T($"Windows RAS VPN подключён: {profile.Name}", $"Windows RAS VPN connected: {profile.Name}"));
                 RefreshAll();
                 return;
             }
 
             _localProxyPort = PortGuard.FirstAvailablePort();
-            _singBox.Start(profile, _localProxyPort, Settings.Routing, AppendLog, OnSingBoxExited);
+            _singBox.Start(profile, _localProxyPort, Settings.Routing, AppendRuntimeLog, OnSingBoxExited);
             _proxy.Enable(LocalProxyHost, _localProxyPort);
             _activeProfile = profile;
             _selectedProfile = profile;
             _isConnected = true;
             _isBusy = false;
             _store.MarkUsed(profile);
-            AppendLog($"Windows system proxy enabled: {LocalProxyHost}:{_localProxyPort}");
+            AppendLog(T($"Windows system proxy включён: {LocalProxyHost}:{_localProxyPort}", $"Windows system proxy enabled: {LocalProxyHost}:{_localProxyPort}"));
             RefreshAll();
 
             _healthStatus = await _healthCheck.CheckAsync(LocalProxyHost, _localProxyPort);
@@ -1147,14 +1168,14 @@ internal sealed class MainWindow : Window
             }
             catch (Exception cleanupError)
             {
-                AppendLog("Cleanup warning: " + cleanupError.Message);
+                AppendLog(T("Предупреждение cleanup: ", "Cleanup warning: ") + cleanupError.Message);
             }
             finally
             {
                 _manualStopInProgress = false;
             }
             _healthStatus = ProxyHealthStatus.LocalFailed(ex.Message);
-            AppendLog("Connect failed: " + ex.Message);
+            AppendLog(T("Подключение не удалось: ", "Connect failed: ") + ex.Message);
             RefreshAll();
         }
     }
@@ -1166,14 +1187,14 @@ internal sealed class MainWindow : Window
         {
             if (_activeProfile?.IsRasProfile() == true)
             {
-                await _rasDial.DisconnectAsync(_activeProfile, AppendLog);
-                AppendLog("Previous Windows RAS VPN disconnected before switching.");
+                await _rasDial.DisconnectAsync(_activeProfile, AppendRuntimeLog);
+                AppendLog(T("Предыдущий Windows RAS VPN отключён перед переключением.", "Previous Windows RAS VPN disconnected before switching."));
             }
             else
             {
                 _singBox.Stop();
                 _proxy.Restore();
-                AppendLog("Previous runtime stopped. Windows system proxy restored before switching.");
+                AppendLog(T("Предыдущий runtime остановлен. Windows system proxy восстановлен перед переключением.", "Previous runtime stopped. Windows system proxy restored before switching."));
             }
         }
         finally
@@ -1189,19 +1210,19 @@ internal sealed class MainWindow : Window
             _manualStopInProgress = true;
             if (_activeProfile?.IsRasProfile() == true)
             {
-                _rasDial.DisconnectAsync(_activeProfile, AppendLog).GetAwaiter().GetResult();
-                if (!fromClosing) AppendLog("Disconnected. Windows RAS VPN stopped.");
+                _rasDial.DisconnectAsync(_activeProfile, AppendRuntimeLog).GetAwaiter().GetResult();
+                if (!fromClosing) AppendLog(T("Отключено. Windows RAS VPN остановлен.", "Disconnected. Windows RAS VPN stopped."));
             }
             else
             {
                 _singBox.Stop();
                 _proxy.Restore();
-                if (!fromClosing) AppendLog("Disconnected. Windows system proxy restored.");
+                if (!fromClosing) AppendLog(T("Отключено. Windows system proxy восстановлен.", "Disconnected. Windows system proxy restored."));
             }
         }
         catch (Exception ex)
         {
-            AppendLog("Disconnect warning: " + ex.Message);
+            AppendLog(T("Предупреждение отключения: ", "Disconnect warning: ") + ex.Message);
         }
         finally
         {
@@ -1220,19 +1241,19 @@ internal sealed class MainWindow : Window
         {
             if (_manualStopInProgress) return;
             if (!_isConnected) return;
-            AppendLog($"sing-box exited unexpectedly with code {exitCode}");
+            AppendLog(T($"sing-box неожиданно завершился с кодом {exitCode}", $"sing-box exited unexpectedly with code {exitCode}"));
             _isConnected = false;
             _isBusy = false;
             _activeProfile = null;
-            _healthStatus = ProxyHealthStatus.LocalFailed("sing-box exited unexpectedly.");
+            _healthStatus = ProxyHealthStatus.LocalFailed(T("sing-box неожиданно завершился.", "sing-box exited unexpectedly."));
             if (!Settings.KillSwitchEnabled)
             {
                 try { _proxy.Restore(); }
-                catch (Exception ex) { AppendLog("Proxy restore warning: " + ex.Message); }
+                catch (Exception ex) { AppendLog(T("Предупреждение восстановления proxy: ", "Proxy restore warning: ") + ex.Message); }
             }
             else
             {
-                AppendLog("Kill Switch enabled: preserving Windows proxy on local endpoint.");
+                AppendLog(T("Kill Switch включён: сохраняю Windows proxy на локальном endpoint.", "Kill Switch enabled: preserving Windows proxy on local endpoint."));
             }
             RefreshAll();
         });
@@ -1255,7 +1276,7 @@ internal sealed class MainWindow : Window
             _store.UpdatePing(profile, value);
             RefreshProfilesPanel();
         }
-        AppendLog("Ping All completed.");
+        AppendLog(T("Проверка всех ping завершена.", "Ping All completed."));
     }
 
     private void SelectFastestProfile()
@@ -1275,13 +1296,17 @@ internal sealed class MainWindow : Window
             target.Children.Add(Card(new StackPanel
             {
                 Spacing = 4,
-                Children = { Text(result.Title, 13, FontWeight.SemiBold), Text(result.Detail, 11, FontWeight.Normal, Ui.SecondaryText) }
+                Children =
+                {
+                    Text(UpdateCheckTitle(result), 13, FontWeight.SemiBold),
+                    Text(UpdateCheckDetail(result), 11, FontWeight.Normal, Ui.SecondaryText)
+                }
             }, result.IsUpdateAvailable ? Ui.BlueSoft : Ui.GreenSoft, padding: new Thickness(12), radius: 14));
             if (result.IsUpdateAvailable) OpenUrl(result.ReleaseUrl);
         }
         catch (Exception ex)
         {
-            target.Children.Add(Text("Failed to check updates: " + ex.Message, 11, FontWeight.Normal, Ui.Warning));
+            target.Children.Add(Text(T("Не удалось проверить обновления: ", "Failed to check updates: ") + ex.Message, 11, FontWeight.Normal, Ui.Warning));
         }
     }
 
@@ -1291,7 +1316,7 @@ internal sealed class MainWindow : Window
         if (clipboard is not null)
         {
             await clipboard.SetTextAsync(Settings.Routing.ExportJson());
-            AppendLog("Routing JSON copied to clipboard.");
+            AppendLog(T("Routing JSON скопирован в буфер.", "Routing JSON copied to clipboard."));
         }
     }
 
@@ -1301,18 +1326,18 @@ internal sealed class MainWindow : Window
         var text = clipboard is null ? null : await clipboard.GetTextAsync();
         if (string.IsNullOrWhiteSpace(text))
         {
-            AppendLog("Clipboard is empty.");
+            AppendLog(T("Буфер обмена пуст.", "Clipboard is empty."));
             return;
         }
         try
         {
             Settings.Routing = RoutingSettings.ImportJson(text);
             SaveSettingsAndRefresh();
-            AppendLog("Routing settings imported from clipboard.");
+            AppendLog(T("Routing settings импортированы из буфера.", "Routing settings imported from clipboard."));
         }
         catch (Exception ex)
         {
-            AppendLog("Invalid routing JSON: " + ex.Message);
+            AppendLog(T("Некорректный routing JSON: ", "Invalid routing JSON: ") + ex.Message);
         }
     }
 
@@ -1323,6 +1348,67 @@ internal sealed class MainWindow : Window
     }
 
     private string T(string ru, string en) => L10n.Text(Settings.Language, ru, en);
+
+    private string ProfileSourceName(Profile profile)
+    {
+        var value = _store.SubscriptionNameFor(profile);
+        return value switch
+        {
+            "Manual" => T("Вручную", "Manual"),
+            "Subscription" => T("Подписка", "Subscription"),
+            _ => value
+        };
+    }
+
+    private string ImportMessage(ImportResult result) => result.Summary is not null
+        ? RefreshSummaryText(result.Summary)
+        : T($"Импортировано {result.ProfilesImported} профилей", $"Imported {result.ProfilesImported} profile(s)");
+
+    private string RefreshSummaryText(SubscriptionRefreshSummary summary) =>
+        T($"{summary.SubscriptionName}: +{summary.Added} / ~{summary.Updated} / -{summary.Removed}, всего {summary.Total}",
+          $"{summary.SubscriptionName}: +{summary.Added} / ~{summary.Updated} / -{summary.Removed}, total {summary.Total}");
+
+    private string UpdateCheckTitle(UpdateCheckResult result) => result.IsUpdateAvailable
+        ? T($"Доступно обновление: {result.LatestVersion}", $"Update available: {result.LatestVersion}")
+        : T("porkn обновлён до последней версии", "porkn is up to date");
+
+    private string UpdateCheckDetail(UpdateCheckResult result) => result.IsUpdateAvailable
+        ? T($"Установлено: {result.LocalVersion}. Последняя версия: {result.LatestVersion}.", $"Installed: {result.LocalVersion}. Latest: {result.LatestVersion}.")
+        : T($"Установлено: {result.LocalVersion}.", $"Installed: {result.LocalVersion}.");
+
+    private static string ExtractRemoteIp(string detail)
+    {
+        const string marker = "Remote IP:";
+        var index = detail.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        return index >= 0 ? detail[(index + marker.Length)..].Trim() : detail.Trim();
+    }
+
+    private void AppendRuntimeLog(string line) => AppendLog(LocalizeRuntimeLog(line));
+
+    private string LocalizeRuntimeLog(string line)
+    {
+        if (line.StartsWith("sing-box exited with code ", StringComparison.OrdinalIgnoreCase))
+        {
+            var code = line["sing-box exited with code ".Length..].Trim();
+            return T($"sing-box завершился с кодом {code}", $"sing-box exited with code {code}");
+        }
+        if (line.StartsWith("Connecting Windows RAS VPN: ", StringComparison.OrdinalIgnoreCase))
+        {
+            var entry = line["Connecting Windows RAS VPN: ".Length..].Trim();
+            return T($"Подключаю Windows RAS VPN: {entry}", $"Connecting Windows RAS VPN: {entry}");
+        }
+        if (line.StartsWith("Disconnecting Windows RAS VPN: ", StringComparison.OrdinalIgnoreCase))
+        {
+            var entry = line["Disconnecting Windows RAS VPN: ".Length..].Trim();
+            return T($"Отключаю Windows RAS VPN: {entry}", $"Disconnecting Windows RAS VPN: {entry}");
+        }
+        if (line.StartsWith("rasdial disconnect returned code ", StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = line["rasdial disconnect returned code ".Length..].Trim();
+            return T($"rasdial вернул код отключения {rest}", $"rasdial disconnect returned code {rest}");
+        }
+        return line;
+    }
 
     private void AppendLog(string line)
     {
@@ -1470,15 +1556,17 @@ internal sealed record AddSocksResult(string Name, string Host, int Port, string
 
 internal sealed class AddSocksDialog : Window
 {
+    private readonly AppLanguage _language;
     private readonly TextBox _name = new() { Text = "SOCKS Proxy" };
     private readonly TextBox _host = new() { Text = "127.0.0.1" };
     private readonly TextBox _port = new() { Text = "1080" };
     private readonly TextBox _username = new();
     private readonly TextBox _password = new();
 
-    public AddSocksDialog()
+    public AddSocksDialog(AppLanguage language)
     {
-        Title = "Add SOCKS";
+        _language = language;
+        Title = T("Добавить SOCKS", "Add SOCKS");
         Width = 480;
         Height = 460;
         MinWidth = 460;
@@ -1496,15 +1584,15 @@ internal sealed class AddSocksDialog : Window
         StyleDialogTextBox(_password);
 
         var stack = new StackPanel { Spacing = 16, Margin = new Thickness(34) };
-        stack.Children.Add(new TextBlock { Text = "Add SOCKS", FontSize = 24, FontWeight = FontWeight.SemiBold, Foreground = Ui.PrimaryText });
-        stack.Children.Add(Field("Name", _name));
-        stack.Children.Add(Field("Host", _host));
-        stack.Children.Add(Field("Port", _port));
-        stack.Children.Add(Field("Username", _username));
-        stack.Children.Add(Field("Password", _password));
-        var cancel = new Button { Content = "Cancel", Padding = new Thickness(16, 9), Background = Ui.CardBackground, Foreground = Ui.PrimaryText, BorderBrush = Ui.BorderBrush, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12) };
+        stack.Children.Add(new TextBlock { Text = T("Добавить SOCKS", "Add SOCKS"), FontSize = 24, FontWeight = FontWeight.SemiBold, Foreground = Ui.PrimaryText });
+        stack.Children.Add(Field(T("Название", "Name"), _name));
+        stack.Children.Add(Field(T("Хост", "Host"), _host));
+        stack.Children.Add(Field(T("Порт", "Port"), _port));
+        stack.Children.Add(Field(T("Пользователь", "Username"), _username));
+        stack.Children.Add(Field(T("Пароль", "Password"), _password));
+        var cancel = new Button { Content = T("Отмена", "Cancel"), Padding = new Thickness(16, 9), Background = Ui.CardBackground, Foreground = Ui.PrimaryText, BorderBrush = Ui.BorderBrush, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12) };
         cancel.Click += (_, _) => Close(null);
-        var add = new Button { Content = "Add", Padding = new Thickness(18, 9), Background = Ui.Blue, Foreground = Brushes.White, BorderBrush = Brushes.Transparent, CornerRadius = new CornerRadius(12) };
+        var add = new Button { Content = T("Добавить", "Add"), Padding = new Thickness(18, 9), Background = Ui.Blue, Foreground = Brushes.White, BorderBrush = Brushes.Transparent, CornerRadius = new CornerRadius(12) };
         add.Click += (_, _) =>
         {
             if (!int.TryParse(_port.Text, out var port)) return;
@@ -1518,6 +1606,8 @@ internal sealed class AddSocksDialog : Window
     {
         return new StackPanel { Spacing = 6, Children = { new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, Foreground = Ui.SecondaryText }, textBox } };
     }
+
+    private string T(string ru, string en) => L10n.Text(_language, ru, en);
 
     private static void StyleDialogTextBox(TextBox textBox)
     {
