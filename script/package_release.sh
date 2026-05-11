@@ -11,7 +11,7 @@ APP_VERSION="${APP_VERSION#v}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RELEASE_DIR="$ROOT_DIR/release"
 DEPS_DIR="$ROOT_DIR/.build/deps"
-SOURCE_RESOURCES="$ROOT_DIR/Sources/porkn/Resources"
+SOURCE_RESOURCES="$ROOT_DIR/apps/macos/Sources/porkn/Resources"
 
 if [[ -z "${DEVELOPER_DIR:-}" && -d "/Applications/Xcode.app/Contents/Developer" ]]; then
   export DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"

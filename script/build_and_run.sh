@@ -29,8 +29,8 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
-if [[ -d "$ROOT_DIR/Sources/porkn/Resources" ]]; then
-  cp -R "$ROOT_DIR/Sources/porkn/Resources/." "$APP_RESOURCES/"
+if [[ -d "$ROOT_DIR/apps/macos/Sources/porkn/Resources" ]]; then
+  cp -R "$ROOT_DIR/apps/macos/Sources/porkn/Resources/." "$APP_RESOURCES/"
   if [[ -f "$APP_RESOURCES/bin/sing-box" ]]; then
     chmod +x "$APP_RESOURCES/bin/sing-box"
   fi

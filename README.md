@@ -1,13 +1,13 @@
 # porkn
 
 <p align="center">
-  <strong>Native macOS proxy/VPN client powered by sing-box.</strong><br>
-  A custom SwiftUI client for subscriptions, VLESS, SOCKS and Trojan profiles with system proxy integration.
+  <strong>Native macOS and Windows proxy/VPN client powered by sing-box.</strong><br>
+  A custom desktop client for subscriptions, VLESS, SOCKS and Trojan profiles with system proxy integration.
 </p>
 
 <p align="center">
   <a href="https://github.com/XRS0/Porkn/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/XRS0/Porkn?label=release"></a>
-  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-macOS%2014%2B%20%7C%20Windows%2010%2B-lightgrey">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.1-orange">
   <img alt="Architecture" src="https://img.shields.io/badge/arch-arm64%20%7C%20x86__64-blue">
   <img alt="Core" src="https://img.shields.io/badge/core-sing--box-green">
@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.2.2
+v0.3.0
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.2.2
+https://github.com/XRS0/Porkn/releases/tag/v0.3.0
 ```
 
 Available release artifacts:
@@ -51,10 +51,12 @@ Available release artifacts:
 ```text
 porkn-macos-arm64.zip
 porkn-macos-x86_64.zip
+porkn-windows-x64.zip
 SHA256SUMS.txt
+SHA256SUMS-windows.txt
 ```
 
-At the current stage, porkn is a working macOS **System Proxy client** with:
+At the current stage, porkn includes a working macOS **System Proxy client** and a first Windows **System Proxy client** with:
 
 * bundled `sing-box` inside the app bundle;
 * subscription import and refresh;
@@ -70,7 +72,8 @@ At the current stage, porkn is a working macOS **System Proxy client** with:
 * Russian / English language setting;
 * GitHub Actions release pipeline;
 * arm64 and x86_64 macOS release builds;
-* NetworkExtension / Full VPN skeleton for future work.
+* NetworkExtension / Full VPN skeleton for future macOS work;
+* first Windows WinForms client with bundled `sing-box.exe` and Windows system proxy integration.
 
 ---
 
@@ -90,7 +93,7 @@ porkn can import multiple profile formats directly from the app UI:
 The parser lives in:
 
 ```text
-Sources/porkn/Services/ConfigParser.swift
+apps/macos/Sources/porkn/Services/ConfigParser.swift
 ```
 
 ### Subscriptions
@@ -120,7 +123,7 @@ Implemented behavior:
 Subscription and profile state is managed by:
 
 ```text
-Sources/porkn/Stores/ProfileStore.swift
+apps/macos/Sources/porkn/Stores/ProfileStore.swift
 ```
 
 ### Profile list UX
@@ -152,7 +155,7 @@ The latest UX fix prevents the profile search field from stealing focus on app l
 Main file:
 
 ```text
-Sources/porkn/Views/SidebarView.swift
+apps/macos/Sources/porkn/Views/SidebarView.swift
 ```
 
 ### Ping All and Auto fastest
@@ -169,8 +172,8 @@ The app provides:
 Implementation:
 
 ```text
-Sources/porkn/Services/PingService.swift
-Sources/porkn/Stores/ProfileStore.swift
+apps/macos/Sources/porkn/Services/PingService.swift
+apps/macos/Sources/porkn/Stores/ProfileStore.swift
 ```
 
 ### Connection lifecycle
@@ -192,7 +195,7 @@ It handles:
 Main file:
 
 ```text
-Sources/porkn/Services/TunnelController.swift
+apps/macos/Sources/porkn/Services/TunnelController.swift
 ```
 
 Connection states:
@@ -209,7 +212,7 @@ case failed(String)
 Defined in:
 
 ```text
-Sources/porkn/Models/ConnectionState.swift
+apps/macos/Sources/porkn/Models/ConnectionState.swift
 ```
 
 ### Atomic server switching
@@ -226,8 +229,8 @@ When a profile is already connected and the user selects another server, porkn p
 Relevant files:
 
 ```text
-Sources/porkn/Views/ContentView.swift
-Sources/porkn/Services/TunnelController.swift
+apps/macos/Sources/porkn/Views/ContentView.swift
+apps/macos/Sources/porkn/Services/TunnelController.swift
 ```
 
 ### System Proxy mode
@@ -253,7 +256,7 @@ porkn:
 Implementation:
 
 ```text
-Sources/porkn/Services/SystemProxyManager.swift
+apps/macos/Sources/porkn/Services/SystemProxyManager.swift
 ```
 
 Local proxy host:
@@ -271,7 +274,7 @@ Dynamic port range:
 Port selection is implemented in:
 
 ```text
-Sources/porkn/Services/PortGuard.swift
+apps/macos/Sources/porkn/Services/PortGuard.swift
 ```
 
 ### sing-box config generation
@@ -281,7 +284,7 @@ porkn generates `sing-box` JSON configuration at runtime.
 Implementation:
 
 ```text
-Sources/porkn/Services/SingBoxConfigGenerator.swift
+apps/macos/Sources/porkn/Services/SingBoxConfigGenerator.swift
 ```
 
 Generated config includes:
@@ -355,8 +358,8 @@ Values can be separated by commas, spaces or new lines.
 Relevant files:
 
 ```text
-Sources/porkn/Models/RoutingSettings.swift
-Sources/porkn/Views/SettingsView.swift
+apps/macos/Sources/porkn/Models/RoutingSettings.swift
+apps/macos/Sources/porkn/Views/SettingsView.swift
 ```
 
 ### Health check
@@ -382,14 +385,14 @@ Possible statuses:
 Implementation:
 
 ```text
-Sources/porkn/Services/ProxyHealthCheckService.swift
-Sources/porkn/Models/ProxyHealthStatus.swift
+apps/macos/Sources/porkn/Services/ProxyHealthCheckService.swift
+apps/macos/Sources/porkn/Models/ProxyHealthStatus.swift
 ```
 
 UI:
 
 ```text
-Sources/porkn/Views/DetailView.swift
+apps/macos/Sources/porkn/Views/DetailView.swift
 ```
 
 ### Kill Switch
@@ -408,7 +411,7 @@ Important behavior:
 Implementation:
 
 ```text
-Sources/porkn/Models/AppSettings.swift
+apps/macos/Sources/porkn/Models/AppSettings.swift
 ```
 
 Core policy:
@@ -428,7 +431,7 @@ porkn has a language setting:
 Implementation:
 
 ```text
-Sources/porkn/Models/AppSettings.swift
+apps/macos/Sources/porkn/Models/AppSettings.swift
 ```
 
 Language enum:
@@ -457,7 +460,7 @@ porkn can check GitHub Releases for updates.
 Implementation:
 
 ```text
-Sources/porkn/Services/UpdateCheckService.swift
+apps/macos/Sources/porkn/Services/UpdateCheckService.swift
 ```
 
 It checks:
@@ -492,13 +495,13 @@ Redacted data includes:
 Implementation:
 
 ```text
-Sources/porkn/Support/SensitiveRedactor.swift
+apps/macos/Sources/porkn/Support/SensitiveRedactor.swift
 ```
 
 Covered by tests:
 
 ```text
-Tests/porknTests/SensitiveRedactorTests.swift
+apps/macos/Tests/porknTests/SensitiveRedactorTests.swift
 ```
 
 ---
@@ -557,24 +560,15 @@ sequenceDiagram
 
 ```text
 porkn/
+├── apps/
+│   ├── macos/
+│   │   ├── Sources/
+│   │   ├── Tests/
+│   │   └── NetworkExtension/
+│   └── windows/
+│       ├── src/Porkn.Windows/
+│       └── scripts/
 ├── Package.swift
-├── Sources/
-│   └── porkn/
-│       ├── App/
-│       │   └── PorknApp.swift
-│       ├── Models/
-│       ├── Services/
-│       ├── Stores/
-│       ├── Support/
-│       ├── Views/
-│       └── Resources/
-│           └── bin/
-│               └── sing-box
-├── Tests/
-│   └── porknTests/
-├── NetworkExtension/
-│   ├── README.md
-│   └── PacketTunnelProvider/
 ├── docs/
 │   ├── NetworkExtension/
 │   │   └── PLAN.md
@@ -591,7 +585,7 @@ porkn/
 ### Main app entrypoint
 
 ```text
-Sources/porkn/App/PorknApp.swift
+apps/macos/Sources/porkn/App/PorknApp.swift
 ```
 
 Contains:
@@ -607,7 +601,7 @@ Contains:
 ### Models
 
 ```text
-Sources/porkn/Models
+apps/macos/Sources/porkn/Models
 ```
 
 Important model files:
@@ -628,7 +622,7 @@ TunnelProfile.swift
 ### Services
 
 ```text
-Sources/porkn/Services
+apps/macos/Sources/porkn/Services
 ```
 
 Important services:
@@ -649,7 +643,7 @@ UpdateCheckService.swift
 ### Store
 
 ```text
-Sources/porkn/Stores/ProfileStore.swift
+apps/macos/Sources/porkn/Stores/ProfileStore.swift
 ```
 
 Responsible for:
@@ -667,7 +661,7 @@ Responsible for:
 ### Views
 
 ```text
-Sources/porkn/Views
+apps/macos/Sources/porkn/Views
 ```
 
 Important views:
@@ -686,7 +680,7 @@ SidebarView.swift
 ### Support
 
 ```text
-Sources/porkn/Support
+apps/macos/Sources/porkn/Support
 ```
 
 ```text
@@ -747,7 +741,7 @@ Stores the previous macOS proxy configuration so it can be restored on disconnec
 * bundled `sing-box` binary at:
 
 ```text
-Sources/porkn/Resources/bin/sing-box
+apps/macos/Sources/porkn/Resources/bin/sing-box
 ```
 
 The release pipeline currently uses Swift tools version:
@@ -806,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.2.2 \
+APP_VERSION=0.3.0 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -829,7 +823,9 @@ Generated artifacts:
 ```text
 release/porkn-macos-arm64.zip
 release/porkn-macos-x86_64.zip
+release/windows/porkn-windows-x64.zip
 release/SHA256SUMS.txt
+release/windows/SHA256SUMS-windows.txt
 ```
 
 ---
@@ -858,7 +854,9 @@ And uploads:
 ```text
 release/porkn-macos-arm64.zip
 release/porkn-macos-x86_64.zip
+release/windows/porkn-windows-x64.zip
 release/SHA256SUMS.txt
+release/windows/SHA256SUMS-windows.txt
 ```
 
 The latest release pipeline fix changed `Package.swift` from Swift tools 6.2 to Swift tools 6.1 so GitHub Actions can build successfully.
@@ -870,7 +868,7 @@ The latest release pipeline fix changed `Package.swift` from Swift tools 6.2 to 
 Test files live in:
 
 ```text
-Tests/porknTests
+apps/macos/Tests/porknTests
 ```
 
 Current test suite includes:
@@ -896,7 +894,7 @@ UpdateCheckServiceTests.swift
 Last known test result:
 
 ```text
-passed, 32 tests
+passed, 32 macOS tests
 ```
 
 Run:
@@ -914,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.2.2 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.0 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -929,9 +927,17 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.2.2
+### v0.3.0
 
 Current release.
+
+Added:
+
+* Windows app as a first-class sibling under `apps/windows`;
+* Windows x64 release artifact;
+* release workflow now builds and publishes macOS and Windows artifacts together.
+
+### v0.2.2
 
 Fixed:
 
@@ -992,20 +998,20 @@ Existing documentation:
 
 ```text
 docs/NetworkExtension/PLAN.md
-NetworkExtension/README.md
+apps/macos/NetworkExtension/README.md
 ```
 
 Existing skeleton:
 
 ```text
-NetworkExtension/PacketTunnelProvider/PacketTunnelProvider.swift
-NetworkExtension/PacketTunnelProvider/PacketTunnelProvider.entitlements
+apps/macos/NetworkExtension/PacketTunnelProvider/PacketTunnelProvider.swift
+apps/macos/NetworkExtension/PacketTunnelProvider/PacketTunnelProvider.entitlements
 ```
 
 Support code:
 
 ```text
-Sources/porkn/Services/NetworkExtensionSupport.swift
+apps/macos/Sources/porkn/Services/NetworkExtensionSupport.swift
 ```
 
 Current behavior:
@@ -1263,3 +1269,35 @@ It already supports practical daily usage scenarios:
 * release arm64/x86_64 builds through GitHub Actions.
 
 The next major milestone is moving from System Proxy mode to a real NetworkExtension-backed Full VPN/TUN mode with proper Apple entitlement, signing and notarized distribution.
+
+---
+
+## Windows client
+
+The Windows client lives next to the macOS app:
+
+```text
+apps/windows
+```
+
+It is implemented as a .NET 8 WinForms app and uses bundled `sing-box.exe`.
+
+Current Windows behavior:
+
+* imports subscription URLs and VLESS/SOCKS/Trojan profile links;
+* generates sing-box config;
+* starts `sing-box.exe` locally;
+* enables Windows per-user system proxy for `127.0.0.1:2080`;
+* restores previous proxy settings on disconnect/app close.
+
+Build on Windows:
+
+```powershell
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.0
+```
+
+Windows release artifact:
+
+```text
+release/windows/porkn-windows-x64.zip
+```

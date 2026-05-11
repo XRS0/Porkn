@@ -11,13 +11,13 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "porkn",
-            path: "Sources/porkn",
+            path: "apps/macos/Sources/porkn",
             resources: [.copy("Resources")]
         ),
         .testTarget(
             name: "porknTests",
             dependencies: ["porkn"],
-            path: "Tests/porknTests"
+            path: "apps/macos/Tests/porknTests"
         )
     ]
 )

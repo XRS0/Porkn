@@ -9,3 +9,6 @@ DerivedData/
 release/
 
 .codex/
+bin/
+obj/
+*.user
