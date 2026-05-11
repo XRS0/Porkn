@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.1
+v0.3.2
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.1
+https://github.com/XRS0/Porkn/releases/tag/v0.3.2
 ```
 
 Available release artifacts:
@@ -73,7 +73,7 @@ At the current stage, porkn includes a working macOS **System Proxy client** and
 * GitHub Actions release pipeline;
 * arm64 and x86_64 macOS release builds;
 * NetworkExtension / Full VPN skeleton for future macOS work;
-* first Windows WinForms client with bundled `sing-box.exe` and Windows system proxy integration.
+* Windows Avalonia UI client with bundled `sing-box.exe`, profile/subscription UX, routing settings, health checks and Windows system proxy integration.
 
 ---
 
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.1 \
+APP_VERSION=0.3.2 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.1 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.2 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,17 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.1
+### v0.3.2
 
 Current release.
+
+Changed:
+
+* fully migrated the Windows client UI from WinForms to Avalonia UI;
+* rebuilt Windows layout around macOS-style sidebar, detail cards, settings and routing screens;
+* added Windows-side settings storage, routing settings, subscriptions, favorites, ping, health checks, update check and proxy-level Kill Switch behavior.
+
+### v0.3.1
 
 Changed:
 
@@ -1288,20 +1296,25 @@ The Windows client lives next to the macOS app:
 apps/windows
 ```
 
-It is implemented as a .NET 8 WinForms app and uses bundled `sing-box.exe`.
+It is implemented as a .NET 8 Avalonia UI desktop app and uses bundled `sing-box.exe`.
 
 Current Windows behavior:
 
-* imports subscription URLs and VLESS/SOCKS/Trojan profile links;
-* generates sing-box config;
-* starts `sing-box.exe` locally;
-* enables Windows per-user system proxy for `127.0.0.1:2080`;
-* restores previous proxy settings on disconnect/app close.
+* imports subscription URLs and VLESS/SOCKS/Trojan/VMess profile links;
+* stores subscriptions and refreshes them with upsert behavior;
+* supports profile search, Favorites, sorting, Ping All and Auto fastest;
+* generates sing-box config with routing settings;
+* starts bundled `sing-box.exe` locally;
+* selects a free local proxy port from `2080...2090`;
+* enables Windows per-user system proxy for the local mixed proxy;
+* runs local/remote proxy health checks;
+* supports proxy-level Kill Switch behavior for unexpected runtime exit;
+* restores previous proxy settings on manual disconnect/app close.
 
 Build on Windows:
 
 ```powershell
-pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.1
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.2
 ```
 
 Windows release artifact:
