@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.4
+v0.3.5
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.4
+https://github.com/XRS0/Porkn/releases/tag/v0.3.5
 ```
 
 Available release artifacts:
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.4 \
+APP_VERSION=0.3.5 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.4 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.5 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,19 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.4
+### v0.3.5
 
 Current release.
+
+Fixed:
+
+* restored the Windows sidebar width to 400 px instead of widening it;
+* changed the Windows sidebar to one full-height scroll area like the macOS sidebar;
+* removed the separate cramped profile-list scroll viewport so profiles flow naturally in the sidebar;
+* moved Import, Settings and runtime summary below the profiles inside the same sidebar scroll;
+* added side margins/padding to sidebar objects so cards and controls no longer sit flush against the sidebar edges.
+
+### v0.3.4
 
 Fixed:
 
@@ -1333,7 +1343,7 @@ Current Windows behavior:
 Build on Windows:
 
 ```powershell
-pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.4
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.5
 ```
 
 Windows release artifact:
