@@ -121,7 +121,7 @@ internal sealed class MainWindow : Window
         var stack = new StackPanel
         {
             Spacing = 0,
-            Width = 400
+            HorizontalAlignment = HorizontalAlignment.Stretch
         };
 
         stack.Children.Add(BuildSidebarHeader());
@@ -138,12 +138,13 @@ internal sealed class MainWindow : Window
         return new Border
         {
             Background = Ui.SidebarBackground,
-            Padding = new Thickness(26, 26, 24, 26),
+            Padding = new Thickness(24, 24, 22, 24),
             Child = new ScrollViewer
             {
                 Content = stack,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalAlignment = HorizontalAlignment.Stretch
             }
         };
     }
@@ -184,7 +185,7 @@ internal sealed class MainWindow : Window
         {
             Orientation = Orientation.Horizontal,
             Spacing = 10,
-            Margin = new Thickness(2, 0, 2, 24),
+            Margin = new Thickness(0, 0, 0, 24),
             Children = { icon, title }
         };
     }
@@ -207,7 +208,7 @@ internal sealed class MainWindow : Window
         _searchText.Watermark = "Search name, host, protocol…";
         _searchText.TextChanged += (_, _) => RefreshProfilesPanel();
         StyleTextBox(_searchText);
-        return Card(_searchText, background: Ui.InputBackground, padding: new Thickness(14, 11), radius: 18, margin: new Thickness(2, 0, 2, 18));
+        return Card(_searchText, background: Ui.InputBackground, padding: new Thickness(14, 11), radius: 18, margin: new Thickness(0, 0, 0, 18));
     }
 
     private Control BuildImportCard()
@@ -247,7 +248,7 @@ internal sealed class MainWindow : Window
         });
         stack.Children.Add(Card(_importText, background: Ui.InputBackground, padding: new Thickness(0), radius: 14));
         stack.Children.Add(actionGrid);
-        return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 22, margin: new Thickness(2, 18, 2, 0));
+        return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 22, margin: new Thickness(0, 18, 0, 0));
     }
 
     private Control BuildImportActions()
@@ -320,7 +321,7 @@ internal sealed class MainWindow : Window
         _sortMode.Margin = new Thickness(14, 0, 0, 0);
         filters.Children.Add(_sortMode);
 
-        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(2, 0, 2, 10) };
+        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 0, 0, 10) };
         stack.Children.Add(SectionLabel("Профили"));
         stack.Children.Add(top);
         stack.Children.Add(filters);
@@ -343,7 +344,7 @@ internal sealed class MainWindow : Window
 
         var subscriptionSummary = _store.LastRefreshSummary?.ShortText ?? $"{_store.Subscriptions.Count} subscription URL";
 
-        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(2, 16, 2, 4) };
+        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 16, 0, 4) };
         stack.Children.Add(settings);
         stack.Children.Add(Card(new StackPanel
         {
@@ -1401,28 +1402,28 @@ internal sealed class AddSocksDialog : Window
 
 internal static class Ui
 {
-    public static readonly IBrush WindowBackground = Brush("#0B0D12");
-    public static readonly IBrush SidebarBackground = Brush("#10141C");
-    public static readonly IBrush CardBackground = Brush("#171C26");
-    public static readonly IBrush SubtleCardBackground = Brush("#131822");
-    public static readonly IBrush SubtleBackground = Brush("#202738");
-    public static readonly IBrush BorderBrush = Brush("#2A3344");
-    public static readonly IBrush InputBackground = Brush("#0D1119");
-    public static readonly IBrush InputReadOnlyBackground = Brush("#101620");
-    public static readonly IBrush InputBorder = Brush("#242D3D");
-    public static readonly IBrush PrimaryText = Brush("#F4F7FB");
-    public static readonly IBrush SecondaryText = Brush("#A7B0C0");
-    public static readonly IBrush TertiaryText = Brush("#737E90");
-    public static readonly IBrush Blue = Brush("#4B8DFF");
-    public static readonly IBrush BlueSoft = Brush("#172A4D");
-    public static readonly IBrush Green = Brush("#38D478");
-    public static readonly IBrush GreenSoft = Brush("#143321");
-    public static readonly IBrush GreenBorder = Brush("#245C38");
-    public static readonly IBrush Red = Brush("#FF6B6B");
-    public static readonly IBrush Warning = Brush("#F6B84A");
-    public static readonly IBrush WarningSoft = Brush("#3A2C12");
-    public static readonly IBrush Yellow = Brush("#F4C84A");
-    public static readonly IBrush LightGlyph = Brush("#2B3446");
+    public static readonly IBrush WindowBackground = Brush("#101010");
+    public static readonly IBrush SidebarBackground = Brush("#161616");
+    public static readonly IBrush CardBackground = Brush("#1F1F21");
+    public static readonly IBrush SubtleCardBackground = Brush("#1A1A1C");
+    public static readonly IBrush SubtleBackground = Brush("#2A2A2D");
+    public static readonly IBrush BorderBrush = Brush("#343437");
+    public static readonly IBrush InputBackground = Brush("#151516");
+    public static readonly IBrush InputReadOnlyBackground = Brush("#18181A");
+    public static readonly IBrush InputBorder = Brush("#303033");
+    public static readonly IBrush PrimaryText = Brush("#F2F2F3");
+    public static readonly IBrush SecondaryText = Brush("#B5B5B8");
+    public static readonly IBrush TertiaryText = Brush("#848488");
+    public static readonly IBrush Blue = Brush("#8E8E93");
+    public static readonly IBrush BlueSoft = Brush("#2C2C2E");
+    public static readonly IBrush Green = Brush("#4CD964");
+    public static readonly IBrush GreenSoft = Brush("#243126");
+    public static readonly IBrush GreenBorder = Brush("#3D5A42");
+    public static readonly IBrush Red = Brush("#FF6961");
+    public static readonly IBrush Warning = Brush("#F5B84B");
+    public static readonly IBrush WarningSoft = Brush("#332A1C");
+    public static readonly IBrush Yellow = Brush("#FFD60A");
+    public static readonly IBrush LightGlyph = Brush("#303033");
 
     private static SolidColorBrush Brush(string hex) => new(Color.Parse(hex));
 }
