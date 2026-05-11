@@ -60,10 +60,10 @@ internal sealed class MainWindow : Window
     public MainWindow()
     {
         Title = "porkn";
-        Width = 1440;
-        Height = 900;
-        MinWidth = 1280;
-        MinHeight = 760;
+        Width = 1280;
+        Height = 840;
+        MinWidth = 1180;
+        MinHeight = 720;
         Background = Ui.WindowBackground;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         TrySetIcon();
@@ -107,7 +107,7 @@ internal sealed class MainWindow : Window
     {
         var root = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("460,*"),
+            ColumnDefinitions = new ColumnDefinitions("400,*"),
             Background = Ui.WindowBackground
         };
         root.Children.Add(BuildSidebar());
@@ -118,32 +118,34 @@ internal sealed class MainWindow : Window
 
     private Control BuildSidebar()
     {
-        var grid = new Grid
+        var stack = new StackPanel
         {
-            RowDefinitions = new RowDefinitions("Auto,Auto,Auto,*,Auto,Auto"),
-            Background = Ui.SidebarBackground,
-            Margin = new Thickness(0),
-            Width = 460
+            Spacing = 0,
+            Width = 400
         };
 
-        var shell = new Border
+        stack.Children.Add(BuildSidebarHeader());
+        stack.Children.Add(BuildSearchCard());
+        stack.Children.Add(BuildProfileActions());
+        stack.Children.Add(new Border
+        {
+            Padding = new Thickness(0, 8, 0, 10),
+            Child = _profilesPanel
+        });
+        stack.Children.Add(BuildImportCard());
+        stack.Children.Add(BuildSidebarFooter());
+
+        return new Border
         {
             Background = Ui.SidebarBackground,
-            Padding = new Thickness(34, 30, 30, 30),
-            Child = grid
+            Padding = new Thickness(26, 26, 24, 26),
+            Child = new ScrollViewer
+            {
+                Content = stack,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            }
         };
-
-        AddToGrid(grid, BuildSidebarHeader(), 0);
-        AddToGrid(grid, BuildSearchCard(), 1);
-        AddToGrid(grid, BuildProfileActions(), 2);
-        AddToGrid(grid, new Border
-        {
-            Padding = new Thickness(0, 8, 0, 8),
-            Child = new ScrollViewer { Content = _profilesPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }
-        }, 3);
-        AddToGrid(grid, BuildImportCard(), 4);
-        AddToGrid(grid, BuildSidebarFooter(), 5);
-        return shell;
     }
 
     private static void AddToGrid(Grid grid, Control control, int row)
@@ -182,7 +184,7 @@ internal sealed class MainWindow : Window
         {
             Orientation = Orientation.Horizontal,
             Spacing = 10,
-            Margin = new Thickness(0, 0, 0, 26),
+            Margin = new Thickness(2, 0, 2, 24),
             Children = { icon, title }
         };
     }
@@ -205,7 +207,7 @@ internal sealed class MainWindow : Window
         _searchText.Watermark = "Search name, host, protocol…";
         _searchText.TextChanged += (_, _) => RefreshProfilesPanel();
         StyleTextBox(_searchText);
-        return Card(_searchText, background: Ui.InputBackground, padding: new Thickness(16, 12), radius: 18, margin: new Thickness(0, 0, 0, 18));
+        return Card(_searchText, background: Ui.InputBackground, padding: new Thickness(14, 11), radius: 18, margin: new Thickness(2, 0, 2, 18));
     }
 
     private Control BuildImportCard()
@@ -245,7 +247,7 @@ internal sealed class MainWindow : Window
         });
         stack.Children.Add(Card(_importText, background: Ui.InputBackground, padding: new Thickness(0), radius: 14));
         stack.Children.Add(actionGrid);
-        return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 22, margin: new Thickness(0, 16, 0, 0));
+        return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 22, margin: new Thickness(2, 18, 2, 0));
     }
 
     private Control BuildImportActions()
@@ -318,7 +320,7 @@ internal sealed class MainWindow : Window
         _sortMode.Margin = new Thickness(14, 0, 0, 0);
         filters.Children.Add(_sortMode);
 
-        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 0, 0, 10) };
+        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(2, 0, 2, 10) };
         stack.Children.Add(SectionLabel("Профили"));
         stack.Children.Add(top);
         stack.Children.Add(filters);
@@ -341,7 +343,7 @@ internal sealed class MainWindow : Window
 
         var subscriptionSummary = _store.LastRefreshSummary?.ShortText ?? $"{_store.Subscriptions.Count} subscription URL";
 
-        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(0, 14, 0, 0) };
+        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(2, 16, 2, 4) };
         stack.Children.Add(settings);
         stack.Children.Add(Card(new StackPanel
         {
@@ -487,7 +489,7 @@ internal sealed class MainWindow : Window
             Padding = new Thickness(14),
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(0, 0, 0, 8)
+            Margin = new Thickness(0, 0, 0, 9)
         };
         button.Click += async (_, _) => await SelectProfileAsync(profile);
         return button;
