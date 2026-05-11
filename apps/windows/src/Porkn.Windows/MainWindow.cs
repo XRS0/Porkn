@@ -159,15 +159,17 @@ internal sealed class MainWindow : Window
             CornerRadius = new CornerRadius(12),
             Background = Brushes.Black,
             ClipToBounds = true,
-            Child = LoadAppIconImage() ?? new TextBlock
-            {
-                Text = "p",
-                Foreground = Brushes.White,
-                FontWeight = FontWeight.Bold,
-                FontSize = 20,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            Child = LoadAppIconImage() is Image appIcon
+                ? appIcon
+                : new TextBlock
+                {
+                    Text = "p",
+                    Foreground = Brushes.White,
+                    FontWeight = FontWeight.Bold,
+                    FontSize = 20,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
         };
 
         var title = new StackPanel { Spacing = 0, VerticalAlignment = VerticalAlignment.Center };
