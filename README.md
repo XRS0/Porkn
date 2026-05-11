@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.6
+v0.3.7
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.6
+https://github.com/XRS0/Porkn/releases/tag/v0.3.7
 ```
 
 Available release artifacts:
@@ -73,7 +73,7 @@ At the current stage, porkn includes a working macOS **System Proxy client** and
 * GitHub Actions release pipeline;
 * arm64 and x86_64 macOS release builds;
 * NetworkExtension / Full VPN skeleton for future macOS work;
-* Windows Avalonia UI client with bundled `sing-box.exe`, profile/subscription UX, routing settings, health checks and Windows system proxy integration.
+* Windows Avalonia UI client with bundled `sing-box.exe`, profile/subscription UX, routing settings, health checks, PBK/RAS VPN import and Windows system proxy integration.
 
 ---
 
@@ -927,9 +927,24 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.6
+### v0.3.7
 
 Current release.
+
+Changed:
+
+* localized the Windows Avalonia UI according to the selected Russian / English language setting;
+* localized sidebar labels, profile details, settings/routing screens, dialogs, status text, update-check text and porkn runtime logs;
+* localized enum-driven sort modes, subscription refresh intervals and routing preset descriptions;
+* kept variable values such as profile names, hosts, ports, file paths, protocol names and raw runtime output unchanged by design.
+
+Added:
+
+* Windows PBK/RAS VPN import from `rasphone.pbk`;
+* managed PBK copy storage inside porkn application data;
+* Windows RAS connect/disconnect flow through `rasdial.exe`.
+
+### v0.3.6
 
 Fixed:
 
