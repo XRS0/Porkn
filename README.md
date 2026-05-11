@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.5
+v0.3.6
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.5
+https://github.com/XRS0/Porkn/releases/tag/v0.3.6
 ```
 
 Available release artifacts:
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.5 \
+APP_VERSION=0.3.6 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.5 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.6 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,18 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.5
+### v0.3.6
 
 Current release.
+
+Fixed:
+
+* fixed the Windows sidebar padding implementation so padding no longer clips/crops child controls;
+* removed the fixed 400 px width from the inner sidebar stack and let content stretch inside the padded container;
+* changed the Windows palette to a neutral macOS-like graphite dark theme;
+* removed blue/navy tints from background surfaces, cards, inputs and selected settings tabs.
+
+### v0.3.5
 
 Fixed:
 
@@ -1343,7 +1352,7 @@ Current Windows behavior:
 Build on Windows:
 
 ```powershell
-pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.5
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.6
 ```
 
 Windows release artifact:
