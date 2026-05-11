@@ -10,7 +10,21 @@ final class UpdateCheckServiceTests: XCTestCase {
         "html_url": "https://github.com/XRS0/Porkn/releases/tag/v1.2.0",
         "name": "v1.2.0",
         "draft": false,
-        "prerelease": false
+        "prerelease": false,
+        "assets": [
+          {
+            "name": "porkn-macos-arm64.zip",
+            "browser_download_url": "https://github.com/XRS0/Porkn/releases/download/v1.2.0/porkn-macos-arm64.zip"
+          },
+          {
+            "name": "porkn-macos-x86_64.zip",
+            "browser_download_url": "https://github.com/XRS0/Porkn/releases/download/v1.2.0/porkn-macos-x86_64.zip"
+          },
+          {
+            "name": "SHA256SUMS.txt",
+            "browser_download_url": "https://github.com/XRS0/Porkn/releases/download/v1.2.0/SHA256SUMS.txt"
+          }
+        ]
       }
       """
 
@@ -19,6 +33,13 @@ final class UpdateCheckServiceTests: XCTestCase {
 
     XCTAssertTrue(result.isUpdateAvailable)
     XCTAssertEqual(result.latestVersion, "1.2.0")
+    XCTAssertTrue(result.canInstall)
+    XCTAssertNotNil(result.sha256SumsURL)
+  }
+
+  func testParsesSha256ForAssetName() {
+    let sums = "abc123  /tmp/release/porkn-macos-arm64.zip\nffff  porkn-macos-x86_64.zip"
+    XCTAssertEqual(UpdateCheckService.parseSha256(sums, assetName: "porkn-macos-arm64.zip"), "abc123")
   }
 
   func testVersionCompareHandlesVPrefixAndPatchNumbers() {

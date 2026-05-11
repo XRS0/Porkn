@@ -1293,20 +1293,54 @@ internal sealed class MainWindow : Window
         try
         {
             var result = await new UpdateCheckService().CheckAsync();
-            target.Children.Add(Card(new StackPanel
+            var resultStack = new StackPanel
             {
-                Spacing = 4,
+                Spacing = 8,
                 Children =
                 {
                     Text(UpdateCheckTitle(result), 13, FontWeight.SemiBold),
                     Text(UpdateCheckDetail(result), 11, FontWeight.Normal, Ui.SecondaryText)
                 }
-            }, result.IsUpdateAvailable ? Ui.BlueSoft : Ui.GreenSoft, padding: new Thickness(12), radius: 14));
-            if (result.IsUpdateAvailable) OpenUrl(result.ReleaseUrl);
+            };
+
+            if (result.IsUpdateAvailable)
+            {
+                var install = PrimaryButton(
+                    result.CanInstall ? T("Скачать и установить", "Download & Install") : T("Открыть релиз", "Open Release"),
+                    result.CanInstall ? Ui.Green : Ui.Blue);
+                install.Click += async (_, _) =>
+                {
+                    if (result.CanInstall) await InstallUpdateAsync(result, target);
+                    else OpenUrl(result.ReleaseUrl);
+                };
+                resultStack.Children.Add(install);
+            }
+
+            target.Children.Add(Card(resultStack, result.IsUpdateAvailable ? Ui.BlueSoft : Ui.GreenSoft, padding: new Thickness(12), radius: 14));
         }
         catch (Exception ex)
         {
             target.Children.Add(Text(T("Не удалось проверить обновления: ", "Failed to check updates: ") + ex.Message, 11, FontWeight.Normal, Ui.Warning));
+        }
+    }
+
+    private async Task InstallUpdateAsync(UpdateCheckResult result, StackPanel target)
+    {
+        try
+        {
+            var progress = Text(T("Подготовка обновления…", "Preparing update…"), 11, FontWeight.Normal, Ui.SecondaryText);
+            target.Children.Add(progress);
+            var service = new UpdateCheckService();
+            await service.DownloadAndInstallAsync(result, line =>
+            {
+                Dispatcher.UIThread.Post(() => progress.Text = LocalizeUpdateProgress(line));
+            });
+            Disconnect(manual: true);
+            Environment.Exit(0);
+        }
+        catch (Exception ex)
+        {
+            target.Children.Add(Text(T("Не удалось установить обновление: ", "Failed to install update: ") + ex.Message, 11, FontWeight.Normal, Ui.Warning));
         }
     }
 
@@ -1373,8 +1407,18 @@ internal sealed class MainWindow : Window
         : T("porkn обновлён до последней версии", "porkn is up to date");
 
     private string UpdateCheckDetail(UpdateCheckResult result) => result.IsUpdateAvailable
-        ? T($"Установлено: {result.LocalVersion}. Последняя версия: {result.LatestVersion}.", $"Installed: {result.LocalVersion}. Latest: {result.LatestVersion}.")
+        ? T($"Установлено: {result.LocalVersion}. Последняя версия: {result.LatestVersion}." + (result.CanInstall ? $" Asset: {result.AssetName}." : " Asset для Windows не найден."),
+            $"Installed: {result.LocalVersion}. Latest: {result.LatestVersion}." + (result.CanInstall ? $" Asset: {result.AssetName}." : " Windows asset was not found."))
         : T($"Установлено: {result.LocalVersion}.", $"Installed: {result.LocalVersion}.");
+
+    private string LocalizeUpdateProgress(string line) => line switch
+    {
+        "Downloading update package…" => T("Скачиваю пакет обновления…", "Downloading update package…"),
+        "Verifying SHA256 checksum…" => T("Проверяю SHA256 checksum…", "Verifying SHA256 checksum…"),
+        "Extracting update package…" => T("Распаковываю обновление…", "Extracting update package…"),
+        "Starting updater and closing porkn…" => T("Запускаю updater и закрываю porkn…", "Starting updater and closing porkn…"),
+        _ => line
+    };
 
     private static string ExtractRemoteIp(string detail)
     {

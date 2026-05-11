@@ -25,6 +25,8 @@ struct SettingsView: View {
   @State private var updateResult: UpdateCheckResult?
   @State private var updateError: String?
   @State private var isCheckingForUpdates = false
+  @State private var isInstallingUpdate = false
+  @State private var updateInstallMessage: String?
 
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
@@ -127,25 +129,38 @@ struct SettingsView: View {
 
       VPNStyleSettingsCard(
         title: t("Обновления", "Updates"),
-        subtitle: t("Проверка последнего GitHub Release и подготовка к Sparkle auto-update.", "Check the latest GitHub Release and prepare Sparkle auto-update."),
+        subtitle: t("Автообновление через GitHub Releases: porkn скачает подходящий ZIP, проверит SHA256 и заменит приложение.", "In-app updates through GitHub Releases: porkn downloads the matching ZIP, verifies SHA256 and replaces the app."),
         systemImage: "arrow.down.circle"
       ) {
         VStack(alignment: .leading, spacing: 10) {
           Button {
             Task { await checkForUpdates() }
           } label: {
-            Label(isCheckingForUpdates ? "Checking…" : "Check for Updates", systemImage: "arrow.clockwise")
+            Label(isCheckingForUpdates ? t("Проверяю…", "Checking…") : t("Проверить обновления", "Check for Updates"), systemImage: "arrow.clockwise")
           }
-          .disabled(isCheckingForUpdates)
+          .disabled(isCheckingForUpdates || isInstallingUpdate)
 
           if let updateResult {
-            VStack(alignment: .leading, spacing: 4) {
-              Text(updateResult.title)
+            VStack(alignment: .leading, spacing: 8) {
+              Text(updateTitle(updateResult))
                 .font(.callout.weight(.semibold))
-              Text(updateResult.detail)
+              Text(updateDetail(updateResult))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-              Link("Open release page", destination: updateResult.releaseURL)
+
+              if updateResult.isUpdateAvailable {
+                Button {
+                  Task { await installUpdate(updateResult) }
+                } label: {
+                  Label(
+                    isInstallingUpdate ? t("Устанавливаю…", "Installing…") : updateResult.canInstall ? t("Скачать и установить", "Download & Install") : t("Открыть релиз", "Open Release"),
+                    systemImage: updateResult.canInstall ? "square.and.arrow.down" : "safari"
+                  )
+                }
+                .disabled(isInstallingUpdate)
+              }
+
+              Link(t("Открыть страницу релиза", "Open release page"), destination: updateResult.releaseURL)
                 .font(.caption.weight(.medium))
             }
             .padding(12)
@@ -153,6 +168,12 @@ struct SettingsView: View {
             .background(
               (updateResult.isUpdateAvailable ? Color.blue : Color.green).opacity(0.10),
               in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+          }
+
+          if let updateInstallMessage {
+            Label(updateInstallMessage, systemImage: "arrow.down.circle")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
 
           if let updateError {
@@ -198,11 +219,64 @@ struct SettingsView: View {
   private func checkForUpdates() async {
     isCheckingForUpdates = true
     updateError = nil
+    updateInstallMessage = nil
     defer { isCheckingForUpdates = false }
     do {
       updateResult = try await UpdateCheckService().check()
     } catch {
       updateError = t("Не удалось проверить обновления", "Failed to check updates") + ": \(error.localizedDescription)"
+    }
+  }
+
+  private func installUpdate(_ result: UpdateCheckResult) async {
+    guard result.canInstall else {
+      NSWorkspace.shared.open(result.releaseURL)
+      return
+    }
+
+    isInstallingUpdate = true
+    updateError = nil
+    defer { isInstallingUpdate = false }
+    do {
+      _ = try await UpdateCheckService().downloadAndInstall(result) { message in
+        Task { @MainActor in
+          updateInstallMessage = localizeUpdateProgress(message)
+        }
+      }
+      NSApp.terminate(nil)
+    } catch {
+      updateError = t("Не удалось установить обновление", "Failed to install update") + ": \(error.localizedDescription)"
+    }
+  }
+
+  private func updateTitle(_ result: UpdateCheckResult) -> String {
+    result.isUpdateAvailable
+      ? t("Доступно обновление: \(result.latestVersion)", "Update available: \(result.latestVersion)")
+      : t("porkn обновлён до последней версии", "porkn is up to date")
+  }
+
+  private func updateDetail(_ result: UpdateCheckResult) -> String {
+    if result.isUpdateAvailable {
+      return t(
+        "Установлено: \(result.currentVersion). Последняя версия: \(result.latestVersion)." + (result.canInstall ? " Asset: \(result.assetName ?? "ZIP")." : " Asset для этого Mac не найден."),
+        "Installed: \(result.currentVersion). Latest: \(result.latestVersion)." + (result.canInstall ? " Asset: \(result.assetName ?? "ZIP")." : " Asset for this Mac was not found.")
+      )
+    }
+    return t("Установлено: \(result.currentVersion).", "Installed: \(result.currentVersion).")
+  }
+
+  private func localizeUpdateProgress(_ message: String) -> String {
+    switch message {
+    case "Downloading update package…":
+      t("Скачиваю пакет обновления…", "Downloading update package…")
+    case "Verifying SHA256 checksum…":
+      t("Проверяю SHA256 checksum…", "Verifying SHA256 checksum…")
+    case "Extracting update package…":
+      t("Распаковываю обновление…", "Extracting update package…")
+    case "Starting updater and closing porkn…":
+      t("Запускаю updater и закрываю porkn…", "Starting updater and closing porkn…")
+    default:
+      message
     }
   }
 
