@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.7
+v0.3.8
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.7
+https://github.com/XRS0/Porkn/releases/tag/v0.3.8
 ```
 
 Available release artifacts:
@@ -927,9 +927,19 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.7
+### v0.3.8
 
 Current release.
+
+Added:
+
+* in-app auto-update flow for macOS and Windows instead of only opening the GitHub release page;
+* platform-aware release asset selection: `porkn-macos-arm64.zip`, `porkn-macos-x86_64.zip` or `porkn-windows-x64.zip`;
+* update package download into porkn Application Support / AppData;
+* SHA256 verification using release checksum files before installation;
+* updater handoff script that waits for porkn to exit, replaces the installed app files and relaunches porkn.
+
+### v0.3.7
 
 Changed:
 
