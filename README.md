@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.0
+v0.3.1
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.0
+https://github.com/XRS0/Porkn/releases/tag/v0.3.1
 ```
 
 Available release artifacts:
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.0 \
+APP_VERSION=0.3.1 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.0 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.1 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,17 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.0
+### v0.3.1
 
 Current release.
+
+Changed:
+
+* refreshed the Windows client visual design to better match the macOS SwiftUI app;
+* added macOS-style sidebar, rounded cards, profile search, connected profile indicator and large status header;
+* bundled the porkn app icon into the Windows app and release package.
+
+### v0.3.0
 
 Added:
 
@@ -1293,7 +1301,7 @@ Current Windows behavior:
 Build on Windows:
 
 ```powershell
-pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.0
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.1
 ```
 
 Windows release artifact:
