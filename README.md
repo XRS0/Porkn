@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.2
+v0.3.3
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.2
+https://github.com/XRS0/Porkn/releases/tag/v0.3.3
 ```
 
 Available release artifacts:
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.2 \
+APP_VERSION=0.3.3 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.2 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.3 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,18 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.2
+### v0.3.3
 
 Current release.
+
+Changed:
+
+* polished the Avalonia Windows client spacing across sidebar, profile rows, detail cards, settings and dialogs;
+* switched the Windows client to a dark theme by default;
+* widened the Windows sidebar/profile list area for more comfortable browsing;
+* replaced default-looking input and combo box styling with porkn dark controls.
+
+### v0.3.2
 
 Changed:
 
@@ -1314,7 +1323,7 @@ Current Windows behavior:
 Build on Windows:
 
 ```powershell
-pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.2
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.3
 ```
 
 Windows release artifact:
