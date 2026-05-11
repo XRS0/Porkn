@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.3
+v0.3.4
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.3
+https://github.com/XRS0/Porkn/releases/tag/v0.3.4
 ```
 
 Available release artifacts:
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.3 \
+APP_VERSION=0.3.4 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.3 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.4 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,19 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.3
+### v0.3.4
 
 Current release.
+
+Fixed:
+
+* reworked the Windows sidebar grid so the profile list owns the flexible vertical area instead of being squeezed by import/subscription blocks;
+* widened the Windows sidebar to 460 px and increased the default window size to 1440×900;
+* moved import controls into a compact bottom card so profiles have substantially more visible space;
+* increased safe padding around sidebar, detail pages, settings pages, cards, rows and dialogs;
+* removed default-looking TextBox/ComboBox borders and replaced them with dark, borderless porkn inputs.
+
+### v0.3.3
 
 Changed:
 
@@ -1323,7 +1333,7 @@ Current Windows behavior:
 Build on Windows:
 
 ```powershell
-pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.3
+pwsh apps/windows/scripts/package.ps1 -AppVersion 0.3.4
 ```
 
 Windows release artifact:
