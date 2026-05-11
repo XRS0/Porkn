@@ -11,8 +11,20 @@ internal static class SingBoxConfigGenerator
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static string Generate(Profile profile, int localProxyPort)
+    public static string Generate(Profile profile, int localProxyPort, RoutingSettings? routingSettings = null)
     {
+        routingSettings ??= RoutingSettings.Default;
+        var routeRules = new List<Dictionary<string, object?>>
+        {
+            new()
+            {
+                ["inbound"] = "mixed-in",
+                ["action"] = "sniff",
+                ["timeout"] = "1s"
+            }
+        };
+        routeRules.AddRange(routingSettings.RouteRules().Select(rule => rule.ToDictionary(kv => kv.Key, kv => (object?)kv.Value)));
+
         var config = new Dictionary<string, object?>
         {
             ["log"] = new Dictionary<string, object?>
@@ -56,15 +68,12 @@ internal static class SingBoxConfigGenerator
             ["route"] = new Dictionary<string, object?>
             {
                 ["auto_detect_interface"] = true,
-                ["rules"] = new object[]
+                ["default_domain_resolver"] = new Dictionary<string, object?>
                 {
-                    new Dictionary<string, object?>
-                    {
-                        ["inbound"] = "mixed-in",
-                        ["action"] = "sniff",
-                        ["timeout"] = "1s"
-                    }
+                    ["server"] = "local",
+                    ["strategy"] = "prefer_ipv4"
                 },
+                ["rules"] = routeRules,
                 ["final"] = "proxy-out"
             }
         };
@@ -79,7 +88,7 @@ internal static class SingBoxConfigGenerator
             "vless" => BuildVless(profile),
             "trojan" => BuildTrojan(profile),
             "socks" => BuildSocks(profile),
-            _ => throw new NotSupportedException($"Unsupported protocol: {profile.Protocol}")
+            _ => throw new NotSupportedException($"sing-box generator does not support {profile.Protocol.ToUpperInvariant()} yet")
         };
     }
 
@@ -105,11 +114,13 @@ internal static class SingBoxConfigGenerator
     {
         var outbound = BaseOutbound(profile, "vless");
         outbound["uuid"] = profile.Username ?? throw new InvalidOperationException("VLESS UUID is missing");
-        outbound["network"] = profile.Query.GetValueOrDefault("network", profile.Query.GetValueOrDefault("type", "tcp"));
+        outbound["network"] = profile.Query.GetValueOrDefault("network", "tcp");
         outbound["packet_encoding"] = profile.Query.GetValueOrDefault("packetEncoding", "xudp");
         if (profile.Query.TryGetValue("flow", out var flow) && !string.IsNullOrWhiteSpace(flow)) outbound["flow"] = flow;
         var tls = Tls(profile);
         if (tls is not null) outbound["tls"] = tls;
+        var transport = Transport(profile);
+        if (transport is not null) outbound["transport"] = transport;
         return outbound;
     }
 
@@ -146,6 +157,29 @@ internal static class SingBoxConfigGenerator
             tls["reality"] = reality;
         }
 
+        if (profile.Query.GetValueOrDefault("allowInsecure") == "1" || profile.Query.GetValueOrDefault("insecure") == "1")
+        {
+            tls["insecure"] = true;
+        }
+
         return tls;
+    }
+
+    private static Dictionary<string, object?>? Transport(Profile profile)
+    {
+        var type = profile.Query.GetValueOrDefault("type", profile.Query.GetValueOrDefault("net", ""));
+        if (string.IsNullOrWhiteSpace(type) || type == "tcp") return null;
+
+        var transport = new Dictionary<string, object?> { ["type"] = type };
+        if (profile.Query.TryGetValue("path", out var path) && !string.IsNullOrWhiteSpace(path)) transport["path"] = path;
+        if (profile.Query.TryGetValue("host", out var host) && !string.IsNullOrWhiteSpace(host))
+        {
+            transport["headers"] = new Dictionary<string, object?> { ["Host"] = host };
+        }
+        if (profile.Query.TryGetValue("serviceName", out var serviceName) && !string.IsNullOrWhiteSpace(serviceName))
+        {
+            transport["service_name"] = serviceName;
+        }
+        return transport;
     }
 }

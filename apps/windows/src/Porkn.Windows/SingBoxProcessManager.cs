@@ -8,13 +8,13 @@ internal sealed class SingBoxProcessManager
 
     public bool IsRunning => _process?.HasExited == false;
 
-    public void Start(Profile profile, int localProxyPort, Action<string> onLog)
+    public void Start(Profile profile, int localProxyPort, RoutingSettings routingSettings, Action<string> onLog, Action<int>? onExited = null)
     {
         if (IsRunning) throw new InvalidOperationException("sing-box is already running");
 
         Directory.CreateDirectory(AppPaths.RuntimeDirectory);
         var configPath = Path.Combine(AppPaths.RuntimeDirectory, "active-sing-box.json");
-        File.WriteAllText(configPath, SingBoxConfigGenerator.Generate(profile, localProxyPort));
+        File.WriteAllText(configPath, SingBoxConfigGenerator.Generate(profile, localProxyPort, routingSettings));
 
         var binary = ResolveSingBoxBinary();
         var process = new Process
@@ -33,7 +33,12 @@ internal sealed class SingBoxProcessManager
 
         process.OutputDataReceived += (_, args) => { if (!string.IsNullOrWhiteSpace(args.Data)) onLog(args.Data); };
         process.ErrorDataReceived += (_, args) => { if (!string.IsNullOrWhiteSpace(args.Data)) onLog(args.Data); };
-        process.Exited += (_, _) => onLog($"sing-box exited with code {process.ExitCode}");
+        process.Exited += (_, _) =>
+        {
+            var exitCode = SafeExitCode(process);
+            onLog($"sing-box exited with code {exitCode}");
+            onExited?.Invoke(exitCode);
+        };
 
         if (!process.Start()) throw new InvalidOperationException("Unable to start sing-box");
         process.BeginOutputReadLine();
@@ -57,6 +62,12 @@ internal sealed class SingBoxProcessManager
             _process.Dispose();
             _process = null;
         }
+    }
+
+    private static int SafeExitCode(Process process)
+    {
+        try { return process.ExitCode; }
+        catch { return -1; }
     }
 
     private static string ResolveSingBoxBinary()

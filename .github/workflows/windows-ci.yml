@@ -1,0 +1,33 @@
+name: Windows app CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/windows/**'
+      - '.github/workflows/windows-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/windows/**'
+      - '.github/workflows/windows-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Avalonia Windows app
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore apps/windows/src/Porkn.Windows/Porkn.Windows.csproj
+
+      - name: Build
+        run: dotnet build apps/windows/src/Porkn.Windows/Porkn.Windows.csproj --configuration Release --no-restore
