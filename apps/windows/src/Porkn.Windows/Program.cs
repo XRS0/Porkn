@@ -30,7 +30,7 @@ internal sealed class PorknApp : Application
     public override void Initialize()
     {
         Styles.Add(new FluentTheme { DensityStyle = DensityStyle.Normal });
-        RequestedThemeVariant = ThemeVariant.Light;
+        RequestedThemeVariant = ThemeVariant.Dark;
     }
 
     public override void OnFrameworkInitializationCompleted()

@@ -35,7 +35,7 @@ internal sealed class MainWindow : Window
     private readonly ProxyHealthCheckService _healthCheck = new();
 
     private readonly StackPanel _subscriptionsPanel = new() { Spacing = 8 };
-    private readonly StackPanel _profilesPanel = new() { Spacing = 6 };
+    private readonly StackPanel _profilesPanel = new() { Spacing = 8 };
     private readonly ContentControl _detailHost = new();
     private readonly TextBox _searchText = new();
     private readonly TextBox _importText = new();
@@ -60,9 +60,9 @@ internal sealed class MainWindow : Window
     public MainWindow()
     {
         Title = "porkn";
-        Width = 1180;
-        Height = 760;
-        MinWidth = 1080;
+        Width = 1280;
+        Height = 820;
+        MinWidth = 1180;
         MinHeight = 700;
         Background = Ui.WindowBackground;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -107,7 +107,7 @@ internal sealed class MainWindow : Window
     {
         var root = new Grid
         {
-            ColumnDefinitions = new ColumnDefinitions("334,*"),
+            ColumnDefinitions = new ColumnDefinitions("400,*"),
             Background = Ui.WindowBackground
         };
         root.Children.Add(BuildSidebar());
@@ -123,13 +123,13 @@ internal sealed class MainWindow : Window
             RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto,Auto,*,Auto"),
             Background = Ui.SidebarBackground,
             Margin = new Thickness(0),
-            Width = 334
+            Width = 400
         };
 
         var shell = new Border
         {
             Background = Ui.SidebarBackground,
-            Padding = new Thickness(18),
+            Padding = new Thickness(24, 22, 22, 22),
             Child = grid
         };
 
@@ -139,7 +139,11 @@ internal sealed class MainWindow : Window
         AddToGrid(grid, BuildImportActions(), 3);
         AddToGrid(grid, BuildSubscriptionsSection(), 4);
         AddToGrid(grid, BuildProfileActions(), 5);
-        AddToGrid(grid, new ScrollViewer { Content = _profilesPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, 6);
+        AddToGrid(grid, new Border
+        {
+            Padding = new Thickness(0, 4, 0, 0),
+            Child = new ScrollViewer { Content = _profilesPanel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }
+        }, 6);
         AddToGrid(grid, BuildSidebarFooter(), 7);
         return shell;
     }
@@ -180,7 +184,7 @@ internal sealed class MainWindow : Window
         {
             Orientation = Orientation.Horizontal,
             Spacing = 10,
-            Margin = new Thickness(0, 0, 0, 18),
+            Margin = new Thickness(0, 0, 0, 22),
             Children = { icon, title }
         };
     }
@@ -202,7 +206,8 @@ internal sealed class MainWindow : Window
     {
         _searchText.Watermark = "Search name, host, protocol…";
         _searchText.TextChanged += (_, _) => RefreshProfilesPanel();
-        return Card(_searchText, padding: new Thickness(12, 8), radius: 13, margin: new Thickness(0, 0, 0, 10));
+        StyleTextBox(_searchText);
+        return Card(_searchText, padding: new Thickness(14, 10), radius: 14, margin: new Thickness(0, 0, 0, 14));
     }
 
     private Control BuildImportCard()
@@ -211,17 +216,18 @@ internal sealed class MainWindow : Window
         _importText.AcceptsReturn = true;
         _importText.TextWrapping = TextWrapping.Wrap;
         _importText.MinHeight = 86;
-        _importText.MaxHeight = 116;
+        _importText.MaxHeight = 118;
+        StyleTextBox(_importText);
 
         var stack = new StackPanel { Spacing = 8 };
         stack.Children.Add(Text("Import Subscription / Config", 12, FontWeight.SemiBold));
         stack.Children.Add(_importText);
-        return Card(stack, padding: new Thickness(14), radius: 18, margin: new Thickness(0, 0, 0, 10));
+        return Card(stack, padding: new Thickness(16), radius: 18, margin: new Thickness(0, 0, 0, 14));
     }
 
     private Control BuildImportActions()
     {
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), Margin = new Thickness(0, 0, 0, 12) };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), Margin = new Thickness(0, 0, 0, 16) };
         var import = SecondaryButton("Import");
         import.Click += async (_, _) => await ImportProfilesAsync();
         var socks = SecondaryButton("SOCKS");
@@ -230,7 +236,9 @@ internal sealed class MainWindow : Window
         delete.Click += (_, _) => DeleteSelectedProfile();
         grid.Children.Add(import);
         Grid.SetColumn(socks, 1);
+        socks.Margin = new Thickness(8, 0, 4, 0);
         Grid.SetColumn(delete, 2);
+        delete.Margin = new Thickness(4, 0, 0, 0);
         grid.Children.Add(socks);
         grid.Children.Add(delete);
         return grid;
@@ -238,21 +246,28 @@ internal sealed class MainWindow : Window
 
     private Control BuildSubscriptionsSection()
     {
-        var stack = new StackPanel { Spacing = 8, Margin = new Thickness(0, 0, 0, 12) };
+        var stack = new StackPanel { Spacing = 8, Margin = new Thickness(0, 0, 0, 14) };
         stack.Children.Add(SectionLabel("Подписки"));
-        stack.Children.Add(_subscriptionsPanel);
+        stack.Children.Add(new ScrollViewer
+        {
+            Content = _subscriptionsPanel,
+            MaxHeight = 138,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        });
         return stack;
     }
 
     private Control BuildProfileActions()
     {
         _favoritesOnly.Content = "Favorites";
+        _favoritesOnly.Foreground = Ui.SecondaryText;
         _favoritesOnly.IsChecked = Settings.FavoritesOnly;
         _favoritesOnly.Checked += (_, _) => { Settings.FavoritesOnly = true; _settingsStore.Save(); RefreshProfilesPanel(); };
         _favoritesOnly.Unchecked += (_, _) => { Settings.FavoritesOnly = false; _settingsStore.Save(); RefreshProfilesPanel(); };
 
         _sortMode.ItemsSource = Enum.GetValues<ProfileSortMode>().Select(mode => mode.Title()).ToList();
         _sortMode.SelectedIndex = (int)Settings.ProfileSortMode;
+        StyleComboBox(_sortMode);
         _sortMode.SelectionChanged += (_, _) =>
         {
             if (_sortMode.SelectedIndex >= 0)
@@ -268,17 +283,19 @@ internal sealed class MainWindow : Window
         var fastest = SecondaryButton("Auto fastest");
         fastest.Click += (_, _) => SelectFastestProfile();
 
-        var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Margin = new Thickness(0, 0, 0, 8) };
+        var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Margin = new Thickness(0, 0, 0, 10) };
         top.Children.Add(pingAll);
         Grid.SetColumn(fastest, 1);
+        fastest.Margin = new Thickness(8, 0, 0, 0);
         top.Children.Add(fastest);
 
         var filters = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         filters.Children.Add(_favoritesOnly);
         Grid.SetColumn(_sortMode, 1);
+        _sortMode.Margin = new Thickness(14, 0, 0, 0);
         filters.Children.Add(_sortMode);
 
-        var stack = new StackPanel { Spacing = 8, Margin = new Thickness(0, 0, 0, 8) };
+        var stack = new StackPanel { Spacing = 10, Margin = new Thickness(0, 0, 0, 12) };
         stack.Children.Add(SectionLabel("Профили"));
         stack.Children.Add(top);
         stack.Children.Add(filters);
@@ -299,7 +316,7 @@ internal sealed class MainWindow : Window
         mode.Children.Add(Text("System Proxy mode", 12, FontWeight.SemiBold));
         mode.Children.Add(Text($"{LocalProxyHost}:{_localProxyPort} · sing-box", 11, FontWeight.Normal, Ui.SecondaryText, monospace: true));
 
-        var stack = new StackPanel { Spacing = 8, Margin = new Thickness(0, 12, 0, 0) };
+        var stack = new StackPanel { Spacing = 10, Margin = new Thickness(0, 16, 0, 0) };
         stack.Children.Add(settings);
         stack.Children.Add(Card(mode, padding: new Thickness(12, 10), radius: 16));
         return stack;
@@ -352,7 +369,7 @@ internal sealed class MainWindow : Window
         row.Children.Add(info);
         Grid.SetColumn(buttons, 1);
         row.Children.Add(buttons);
-        return Card(row, padding: new Thickness(10), radius: 14, margin: new Thickness(0, 0, 0, 2));
+        return Card(row, padding: new Thickness(12), radius: 14, margin: new Thickness(0, 0, 0, 4));
     }
 
     private void RefreshProfilesPanel()
@@ -367,7 +384,7 @@ internal sealed class MainWindow : Window
         {
             _profilesPanel.Children.Add(Card(new StackPanel
             {
-                Spacing = 6,
+                Spacing = 8,
                 Children =
                 {
                     Text("Нет конфигов", 13, FontWeight.SemiBold),
@@ -433,10 +450,10 @@ internal sealed class MainWindow : Window
             BorderBrush = border,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(16),
-            Padding = new Thickness(10),
+            Padding = new Thickness(12),
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(0, 0, 0, 2)
+            Margin = new Thickness(0, 0, 0, 6)
         };
         button.Click += async (_, _) => await SelectProfileAsync(profile);
         return button;
@@ -493,7 +510,7 @@ internal sealed class MainWindow : Window
         {
             Content = new Border
             {
-                Padding = new Thickness(30, 28),
+                Padding = new Thickness(38, 34, 42, 38),
                 Child = stack
             }
         };
@@ -560,7 +577,9 @@ internal sealed class MainWindow : Window
         var buttonRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto") };
         buttonRow.Children.Add(action);
         Grid.SetColumn(favorite, 1);
+        favorite.Margin = new Thickness(12, 0, 8, 0);
         Grid.SetColumn(delete, 2);
+        delete.Margin = new Thickness(0);
         buttonRow.Children.Add(favorite);
         buttonRow.Children.Add(delete);
 
@@ -631,6 +650,7 @@ internal sealed class MainWindow : Window
             FontFamily = FontFamily.Parse("Consolas"),
             MaxHeight = 260
         };
+        StyleTextBox(preview, readOnly: true);
         stack.Children.Add(Text("Предпросмотр sing-box JSON", 13, FontWeight.SemiBold));
         stack.Children.Add(preview);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 18);
@@ -660,8 +680,9 @@ internal sealed class MainWindow : Window
             MinHeight = 130,
             MaxHeight = 220
         };
+        StyleTextBox(logText, readOnly: true);
         _logTextControl = logText;
-        var stack = new StackPanel { Spacing = 10 };
+        var stack = new StackPanel { Spacing = 12 };
         stack.Children.Add(Text("Advanced Logs", 16, FontWeight.SemiBold));
         stack.Children.Add(logText);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 18);
@@ -678,7 +699,8 @@ internal sealed class MainWindow : Window
             FontFamily = FontFamily.Parse("Consolas"),
             MaxHeight = 150
         };
-        var stack = new StackPanel { Spacing = 10 };
+        StyleTextBox(raw, readOnly: true);
+        var stack = new StackPanel { Spacing = 12 };
         stack.Children.Add(Text("Исходный конфиг", 16, FontWeight.SemiBold));
         stack.Children.Add(raw);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(18), radius: 18);
@@ -706,7 +728,7 @@ internal sealed class MainWindow : Window
 
     private Control BuildSettingsView()
     {
-        var stack = new StackPanel { Spacing = 22, MaxWidth = 980 };
+        var stack = new StackPanel { Spacing = 24, MaxWidth = 1040 };
         stack.Children.Add(new StackPanel
         {
             Spacing = 8,
@@ -718,7 +740,7 @@ internal sealed class MainWindow : Window
         });
         stack.Children.Add(BuildSettingsTabs());
         stack.Children.Add(_settingsTab == SettingsTab.General ? BuildGeneralSettings() : BuildRoutingSettings());
-        return new ScrollViewer { Content = new Border { Padding = new Thickness(30, 28), Child = stack } };
+        return new ScrollViewer { Content = new Border { Padding = new Thickness(38, 34, 42, 38), Child = stack } };
     }
 
     private Control BuildSettingsTabs()
@@ -729,6 +751,7 @@ internal sealed class MainWindow : Window
         var routing = SecondaryButton("Routing");
         routing.Background = _settingsTab == SettingsTab.Routing ? Ui.BlueSoft : Ui.CardBackground;
         routing.Click += (_, _) => { _settingsTab = SettingsTab.Routing; RefreshDetail(); };
+        routing.Margin = new Thickness(10, 0, 0, 0);
         return new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Children = { general, WithColumn(routing, 1) } };
     }
 
@@ -737,6 +760,7 @@ internal sealed class MainWindow : Window
         var stack = new StackPanel { Spacing = 16 };
 
         var language = new ComboBox { ItemsSource = Enum.GetValues<AppLanguage>().Select(item => item.Title()).ToList(), SelectedIndex = (int)Settings.Language };
+        StyleComboBox(language);
         language.SelectionChanged += (_, _) =>
         {
             if (language.SelectedIndex >= 0)
@@ -758,6 +782,7 @@ internal sealed class MainWindow : Window
 
         var subscriptions = new StackPanel { Spacing = 10 };
         var autoRefresh = new ComboBox { ItemsSource = Enum.GetValues<SubscriptionAutoRefreshInterval>().Select(item => item.Title()).ToList(), SelectedIndex = (int)Settings.SubscriptionAutoRefreshInterval };
+        StyleComboBox(autoRefresh);
         autoRefresh.SelectionChanged += (_, _) =>
         {
             if (autoRefresh.SelectedIndex >= 0)
@@ -777,6 +802,7 @@ internal sealed class MainWindow : Window
         stack.Children.Add(SettingsCard(T("Обновления", "Updates"), T("Проверка последнего GitHub Release.", "Check latest GitHub Release."), update));
 
         var core = new ComboBox { ItemsSource = new[] { "sing-box", "Xray-core" }, SelectedIndex = Settings.PreferredCore == "xray" ? 1 : 0 };
+        StyleComboBox(core);
         core.SelectionChanged += (_, _) =>
         {
             Settings.PreferredCore = core.SelectedIndex == 1 ? "xray" : "sing-box";
@@ -790,6 +816,7 @@ internal sealed class MainWindow : Window
     {
         var stack = new StackPanel { Spacing = 16 };
         var preset = new ComboBox { ItemsSource = Enum.GetValues<RoutingPreset>().Select(item => item.Title()).ToList(), SelectedIndex = (int)Settings.Routing.Preset };
+        StyleComboBox(preset);
         var presetDetail = Text(Settings.Routing.Preset.Detail(), 12, FontWeight.Normal, Ui.SecondaryText);
         preset.SelectionChanged += (_, _) =>
         {
@@ -842,6 +869,7 @@ internal sealed class MainWindow : Window
             FontFamily = FontFamily.Parse("Consolas"),
             MinHeight = 160
         };
+        StyleTextBox(preview, readOnly: true);
         stack.Children.Add(SettingsCard("Предпросмотр правил", "Так porkn добавит routing в generated sing-box config.", preview));
         return stack;
     }
@@ -874,7 +902,8 @@ internal sealed class MainWindow : Window
 
     private Control DomainEditor(string title, string subtitle, string value, Action<string> update)
     {
-        var text = new TextBox { Text = value, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 72 };
+        var text = new TextBox { Text = value, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 86 };
+        StyleTextBox(text);
         text.TextChanged += (_, _) => { update(text.Text ?? ""); _settingsStore.Save(); };
         return new StackPanel { Spacing = 6, Children = { Text(title, 13, FontWeight.SemiBold), Text(subtitle, 11, FontWeight.Normal, Ui.SecondaryText), text } };
     }
@@ -882,6 +911,7 @@ internal sealed class MainWindow : Window
     private void AddPresetButton(Grid grid, int column, string title, Action action)
     {
         var button = SecondaryButton(title);
+        if (column > 0) button.Margin = new Thickness(10, 0, 0, 0);
         button.Click += (_, _) => action();
         Grid.SetColumn(button, column);
         grid.Children.Add(button);
@@ -1157,6 +1187,25 @@ internal sealed class MainWindow : Window
         return grid;
     }
 
+    private static void StyleTextBox(TextBox textBox, bool readOnly = false)
+    {
+        textBox.Background = readOnly ? Ui.InputReadOnlyBackground : Ui.InputBackground;
+        textBox.Foreground = Ui.PrimaryText;
+        textBox.BorderBrush = Ui.InputBorder;
+        textBox.BorderThickness = new Thickness(1);
+        textBox.Padding = new Thickness(12, 9);
+    }
+
+    private static void StyleComboBox(ComboBox comboBox)
+    {
+        comboBox.Background = Ui.InputBackground;
+        comboBox.Foreground = Ui.PrimaryText;
+        comboBox.BorderBrush = Ui.InputBorder;
+        comboBox.BorderThickness = new Thickness(1);
+        comboBox.Padding = new Thickness(12, 8);
+        comboBox.HorizontalAlignment = HorizontalAlignment.Stretch;
+    }
+
     private Button PrimaryButton(string text, IBrush brush) => new()
     {
         Content = text,
@@ -1178,7 +1227,7 @@ internal sealed class MainWindow : Window
         BorderBrush = Ui.BorderBrush,
         BorderThickness = new Thickness(1),
         CornerRadius = new CornerRadius(12),
-        Padding = new Thickness(12, 8),
+        Padding = new Thickness(14, 9),
         FontWeight = FontWeight.SemiBold,
         HorizontalAlignment = HorizontalAlignment.Stretch,
         HorizontalContentAlignment = HorizontalAlignment.Center
@@ -1191,7 +1240,8 @@ internal sealed class MainWindow : Window
         Height = 28,
         Padding = new Thickness(0),
         CornerRadius = new CornerRadius(10),
-        Background = Ui.CardBackground,
+        Background = Ui.SubtleBackground,
+        Foreground = Ui.PrimaryText,
         BorderBrush = Ui.BorderBrush,
         BorderThickness = new Thickness(1)
     };
@@ -1261,24 +1311,32 @@ internal sealed class AddSocksDialog : Window
     public AddSocksDialog()
     {
         Title = "Add SOCKS";
-        Width = 420;
-        Height = 390;
+        Width = 480;
+        Height = 460;
+        MinWidth = 460;
+        Background = Ui.WindowBackground;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Content = Build();
     }
 
     private Control Build()
     {
-        var stack = new StackPanel { Spacing = 12, Margin = new Thickness(22) };
-        stack.Children.Add(new TextBlock { Text = "Add SOCKS", FontSize = 22, FontWeight = FontWeight.SemiBold });
+        StyleDialogTextBox(_name);
+        StyleDialogTextBox(_host);
+        StyleDialogTextBox(_port);
+        StyleDialogTextBox(_username);
+        StyleDialogTextBox(_password);
+
+        var stack = new StackPanel { Spacing = 14, Margin = new Thickness(28) };
+        stack.Children.Add(new TextBlock { Text = "Add SOCKS", FontSize = 24, FontWeight = FontWeight.SemiBold, Foreground = Ui.PrimaryText });
         stack.Children.Add(Field("Name", _name));
         stack.Children.Add(Field("Host", _host));
         stack.Children.Add(Field("Port", _port));
         stack.Children.Add(Field("Username", _username));
         stack.Children.Add(Field("Password", _password));
-        var cancel = new Button { Content = "Cancel", Padding = new Thickness(14, 8) };
+        var cancel = new Button { Content = "Cancel", Padding = new Thickness(16, 9), Background = Ui.CardBackground, Foreground = Ui.PrimaryText, BorderBrush = Ui.BorderBrush, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12) };
         cancel.Click += (_, _) => Close(null);
-        var add = new Button { Content = "Add", Padding = new Thickness(14, 8), Background = Ui.Blue, Foreground = Brushes.White };
+        var add = new Button { Content = "Add", Padding = new Thickness(18, 9), Background = Ui.Blue, Foreground = Brushes.White, BorderBrush = Brushes.Transparent, CornerRadius = new CornerRadius(12) };
         add.Click += (_, _) =>
         {
             if (!int.TryParse(_port.Text, out var port)) return;
@@ -1290,7 +1348,16 @@ internal sealed class AddSocksDialog : Window
 
     private static Control Field(string title, TextBox textBox)
     {
-        return new StackPanel { Spacing = 4, Children = { new TextBlock { Text = title, FontWeight = FontWeight.SemiBold }, textBox } };
+        return new StackPanel { Spacing = 6, Children = { new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, Foreground = Ui.SecondaryText }, textBox } };
+    }
+
+    private static void StyleDialogTextBox(TextBox textBox)
+    {
+        textBox.Background = Ui.InputBackground;
+        textBox.Foreground = Ui.PrimaryText;
+        textBox.BorderBrush = Ui.InputBorder;
+        textBox.BorderThickness = new Thickness(1);
+        textBox.Padding = new Thickness(12, 9);
     }
 
     private static string? EmptyToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
@@ -1298,25 +1365,28 @@ internal sealed class AddSocksDialog : Window
 
 internal static class Ui
 {
-    public static readonly IBrush WindowBackground = Brush("#F6F6F8");
-    public static readonly IBrush SidebarBackground = Brush("#EFF0F4");
-    public static readonly IBrush CardBackground = Brush("#FFFFFF");
-    public static readonly IBrush SubtleCardBackground = Brush("#FCFCFD");
-    public static readonly IBrush SubtleBackground = Brush("#F6F7FA");
-    public static readonly IBrush BorderBrush = Brush("#DEE0E6");
-    public static readonly IBrush PrimaryText = Brush("#1D1D1F");
-    public static readonly IBrush SecondaryText = Brush("#696970");
-    public static readonly IBrush TertiaryText = Brush("#91919A");
-    public static readonly IBrush Blue = Brush("#0070F5");
-    public static readonly IBrush BlueSoft = Brush("#E8F2FF");
-    public static readonly IBrush Green = Brush("#249C52");
-    public static readonly IBrush GreenSoft = Brush("#E7F7ED");
-    public static readonly IBrush GreenBorder = Brush("#B2E2C1");
-    public static readonly IBrush Red = Brush("#CC3B3B");
-    public static readonly IBrush Warning = Brush("#D68B15");
-    public static readonly IBrush WarningSoft = Brush("#FFF5E4");
-    public static readonly IBrush Yellow = Brush("#D8A600");
-    public static readonly IBrush LightGlyph = Brush("#E0E2E8");
+    public static readonly IBrush WindowBackground = Brush("#0B0D12");
+    public static readonly IBrush SidebarBackground = Brush("#10141C");
+    public static readonly IBrush CardBackground = Brush("#171C26");
+    public static readonly IBrush SubtleCardBackground = Brush("#131822");
+    public static readonly IBrush SubtleBackground = Brush("#202738");
+    public static readonly IBrush BorderBrush = Brush("#2A3344");
+    public static readonly IBrush InputBackground = Brush("#0F131B");
+    public static readonly IBrush InputReadOnlyBackground = Brush("#111722");
+    public static readonly IBrush InputBorder = Brush("#313B4F");
+    public static readonly IBrush PrimaryText = Brush("#F4F7FB");
+    public static readonly IBrush SecondaryText = Brush("#A7B0C0");
+    public static readonly IBrush TertiaryText = Brush("#737E90");
+    public static readonly IBrush Blue = Brush("#4B8DFF");
+    public static readonly IBrush BlueSoft = Brush("#172A4D");
+    public static readonly IBrush Green = Brush("#38D478");
+    public static readonly IBrush GreenSoft = Brush("#143321");
+    public static readonly IBrush GreenBorder = Brush("#245C38");
+    public static readonly IBrush Red = Brush("#FF6B6B");
+    public static readonly IBrush Warning = Brush("#F6B84A");
+    public static readonly IBrush WarningSoft = Brush("#3A2C12");
+    public static readonly IBrush Yellow = Brush("#F4C84A");
+    public static readonly IBrush LightGlyph = Brush("#2B3446");
 
     private static SolidColorBrush Brush(string hex) => new(Color.Parse(hex));
 }
