@@ -116,6 +116,15 @@ internal sealed class ProfileStore
         Save();
     }
 
+
+    public ImportResult ImportRasPhonebook(string path)
+    {
+        var profiles = RasPhonebookImporter.Import(path);
+        UpsertManualProfiles(profiles);
+        Save();
+        return new ImportResult { ProfilesImported = profiles.Count };
+    }
+
     public void AddManualSocks(string name, string host, int port, string? username, string? password)
     {
         var auth = string.IsNullOrWhiteSpace(username)

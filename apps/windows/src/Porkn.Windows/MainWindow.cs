@@ -33,6 +33,7 @@ internal sealed class MainWindow : Window
     private readonly WindowsProxyManager _proxy = new();
     private readonly PingService _pingService = new();
     private readonly ProxyHealthCheckService _healthCheck = new();
+    private readonly RasDialManager _rasDial = new();
 
     private readonly StackPanel _subscriptionsPanel = new() { Spacing = 8 };
     private readonly StackPanel _profilesPanel = new() { Spacing = 8 };
@@ -222,18 +223,28 @@ internal sealed class MainWindow : Window
 
         var import = SecondaryButton("Import");
         import.Click += async (_, _) => await ImportProfilesAsync();
+        var pbk = SecondaryButton("PBK VPN");
+        pbk.Click += async (_, _) => await ImportPbkAsync();
         var socks = SecondaryButton("SOCKS");
         socks.Click += async (_, _) => await ShowSocksDialogAsync();
         var delete = SecondaryButton("Delete", Ui.Red);
         delete.Click += (_, _) => DeleteSelectedProfile();
 
-        var actionGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*") };
+        var actionGrid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions("Auto,Auto")
+        };
         actionGrid.Children.Add(import);
-        Grid.SetColumn(socks, 1);
-        socks.Margin = new Thickness(10, 0, 5, 0);
+        Grid.SetColumn(pbk, 1);
+        pbk.Margin = new Thickness(10, 0, 0, 0);
+        actionGrid.Children.Add(pbk);
+        Grid.SetRow(socks, 1);
+        socks.Margin = new Thickness(0, 10, 5, 0);
         actionGrid.Children.Add(socks);
-        Grid.SetColumn(delete, 2);
-        delete.Margin = new Thickness(5, 0, 0, 0);
+        Grid.SetColumn(delete, 1);
+        Grid.SetRow(delete, 1);
+        delete.Margin = new Thickness(5, 10, 0, 0);
         actionGrid.Children.Add(delete);
 
         var stack = new StackPanel { Spacing = 12 };
@@ -568,7 +579,9 @@ internal sealed class MainWindow : Window
         };
     }
 
-    private string HealthStatusTitle() => _healthStatus.Kind switch
+    private string HealthStatusTitle() => _activeProfile?.IsRasProfile() == true && _isConnected
+        ? "VPN connected"
+        : _healthStatus.Kind switch
     {
         ProxyHealthKind.Protected or ProxyHealthKind.ProxyReachable => "Protected",
         ProxyHealthKind.Checking => "Checking protection",
@@ -591,7 +604,7 @@ internal sealed class MainWindow : Window
         var info = new StackPanel { Spacing = 6 };
         info.Children.Add(Text(profile.Name, 22, FontWeight.SemiBold));
         info.Children.Add(Text(profile.Endpoint, 14, FontWeight.Normal, Ui.SecondaryText, monospace: true));
-        info.Children.Add(Text(connectedToThis ? $"Local proxy: {LocalProxyHost}:{_localProxyPort}" : "System Proxy scenario", 12, FontWeight.Normal, Ui.TertiaryText, monospace: true));
+        info.Children.Add(Text(ConnectionSubtitle(profile, connectedToThis), 12, FontWeight.Normal, Ui.TertiaryText, monospace: true));
         top.Children.Add(info);
         var badge = Pill(profile.Protocol.ToUpperInvariant(), Ui.SecondaryText, Ui.SubtleBackground, new Thickness(12, 8));
         Grid.SetColumn(badge, 1);
@@ -627,6 +640,17 @@ internal sealed class MainWindow : Window
         return Card(stack, padding: new Thickness(28), radius: 26);
     }
 
+    private string ConnectionSubtitle(Profile profile, bool connectedToThis)
+    {
+        if (ProfileKinds.IsRasProfile(profile))
+        {
+            var phonebook = profile.Query.GetValueOrDefault("phonebook_path", "managed rasphone.pbk");
+            return connectedToThis ? $"Windows RAS VPN · {phonebook}" : "Windows RAS VPN scenario";
+        }
+
+        return connectedToThis ? $"Local proxy: {LocalProxyHost}:{_localProxyPort}" : "System Proxy scenario";
+    }
+
     private Control BuildHealthRow()
     {
         var color = HealthStatusColor();
@@ -656,8 +680,17 @@ internal sealed class MainWindow : Window
         var stack = new StackPanel { Spacing = 12 };
         stack.Children.Add(Text("Параметры", 16, FontWeight.SemiBold));
         stack.Children.Add(MetadataRow("Протокол", profile.Protocol.ToUpperInvariant()));
-        stack.Children.Add(MetadataRow("Сервер", profile.Endpoint, monospace: true));
-        stack.Children.Add(MetadataRow("Ping", FormatLatency(profile.LastPingMilliseconds), trailing: ping));
+        stack.Children.Add(MetadataRow(ProfileKinds.IsRasProfile(profile) ? "Entry" : "Сервер", profile.Endpoint, monospace: true));
+        if (ProfileKinds.IsRasProfile(profile))
+        {
+            if (profile.Query.TryGetValue("phonebook_path", out var phonebookPath)) stack.Children.Add(MetadataRow("Phonebook", phonebookPath, monospace: true));
+            if (profile.Query.TryGetValue("device", out var device)) stack.Children.Add(MetadataRow("Device", device));
+            if (profile.Query.TryGetValue("vpn_strategy", out var strategy)) stack.Children.Add(MetadataRow("VPN strategy", strategy));
+        }
+        else
+        {
+            stack.Children.Add(MetadataRow("Ping", FormatLatency(profile.LastPingMilliseconds), trailing: ping));
+        }
         if (profile.Query.TryGetValue("type", out var transport) || profile.Query.TryGetValue("net", out transport))
         {
             stack.Children.Add(MetadataRow("Transport", transport));
@@ -672,11 +705,16 @@ internal sealed class MainWindow : Window
 
     private Control BuildScenarioCard(Profile profile)
     {
+        var isRas = ProfileKinds.IsRasProfile(profile);
         var stack = new StackPanel { Spacing = 12 };
         stack.Children.Add(Text("Сценарий подключения", 16, FontWeight.SemiBold));
-        stack.Children.Add(Pill("System Proxy", Ui.PrimaryText, Ui.SubtleBackground, new Thickness(12, 7)));
-        stack.Children.Add(Text("Windows production mode mirrors macOS System Proxy: bundled sing-box opens a local mixed proxy and porkn points Windows system proxy to it.", 12, FontWeight.Normal, Ui.SecondaryText));
-        stack.Children.Add(Text("Full VPN/TUN mode is planned, but it requires a separate Windows packet capture/TUN driver strategy.", 12, FontWeight.Normal, Ui.Warning));
+        stack.Children.Add(Pill(isRas ? "Windows RAS VPN" : "System Proxy", Ui.PrimaryText, Ui.SubtleBackground, new Thickness(12, 7)));
+        stack.Children.Add(Text(isRas
+            ? "porkn imports entries from rasphone.pbk, keeps a managed copy in Application Support and connects through Windows rasdial.exe."
+            : "Windows production mode mirrors macOS System Proxy: bundled sing-box opens a local mixed proxy and porkn points Windows system proxy to it.", 12, FontWeight.Normal, Ui.SecondaryText));
+        stack.Children.Add(Text(isRas
+            ? "Credentials are not extracted from the phonebook. If Windows has saved credentials, rasdial can reuse them; otherwise Windows may require credentials for the entry."
+            : "Full VPN/TUN mode is planned, but it requires a separate Windows packet capture/TUN driver strategy.", 12, FontWeight.Normal, isRas ? Ui.SecondaryText : Ui.Warning));
 
         var preview = new TextBox
         {
@@ -688,13 +726,15 @@ internal sealed class MainWindow : Window
             MaxHeight = 260
         };
         StyleTextBox(preview, readOnly: true);
-        stack.Children.Add(Text("Предпросмотр sing-box JSON", 13, FontWeight.SemiBold));
+        stack.Children.Add(Text(isRas ? "Предпросмотр PBK entry" : "Предпросмотр sing-box JSON", 13, FontWeight.SemiBold));
         stack.Children.Add(preview);
         return Card(stack, Ui.SubtleCardBackground, padding: new Thickness(24), radius: 22);
     }
 
     private string SafeConfigPreview(Profile profile)
     {
+        if (ProfileKinds.IsRasProfile(profile)) return SensitiveRedactor.Redact(profile.RawConfig);
+
         try
         {
             return SensitiveRedactor.Redact(SingBoxConfigGenerator.Generate(profile, _localProxyPort, Settings.Routing));
@@ -747,9 +787,11 @@ internal sealed class MainWindow : Window
     {
         var import = PrimaryButton("Import Subscription", Ui.Blue);
         import.Click += async (_, _) => await ImportProfilesAsync();
+        var pbk = SecondaryButton("Import PBK VPN");
+        pbk.Click += async (_, _) => await ImportPbkAsync();
         var socks = SecondaryButton("Add SOCKS");
         socks.Click += async (_, _) => await ShowSocksDialogAsync();
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center, Children = { import, socks } };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Center, Children = { import, pbk, socks } };
         return Card(new StackPanel
         {
             Spacing = 18,
@@ -976,6 +1018,47 @@ internal sealed class MainWindow : Window
         }
     }
 
+    private async Task ImportPbkAsync()
+    {
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Import rasphone.pbk",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("Windows phonebook") { Patterns = ["*.pbk"] },
+                    FilePickerFileTypes.All
+                ]
+            });
+            var file = files.FirstOrDefault();
+            if (file is null) return;
+
+            var path = await ResolveLocalFilePathAsync(file);
+            var result = _store.ImportRasPhonebook(path);
+            _selectedProfile = _store.Profiles.LastOrDefault(profile => ProfileKinds.IsRasProfile(profile)) ?? _selectedProfile;
+            AppendLog($"Imported {result.ProfilesImported} Windows RAS VPN profile(s) from {file.Name}");
+            RefreshAll();
+        }
+        catch (Exception ex)
+        {
+            AppendLog("PBK import failed: " + ex.Message);
+        }
+    }
+
+    private static async Task<string> ResolveLocalFilePathAsync(IStorageFile file)
+    {
+        var localPath = file.TryGetLocalPath();
+        if (!string.IsNullOrWhiteSpace(localPath)) return localPath;
+
+        var tempPath = Path.Combine(Path.GetTempPath(), $"porkn-{Guid.NewGuid():N}-{file.Name}");
+        await using var source = await file.OpenReadAsync();
+        await using var destination = File.Create(tempPath);
+        await source.CopyToAsync(destination);
+        return tempPath;
+    }
+
     private async Task RefreshSubscriptionAsync(Subscription subscription)
     {
         try
@@ -1013,11 +1096,21 @@ internal sealed class MainWindow : Window
         {
             if (_isConnected || _singBox.IsRunning)
             {
-                _manualStopInProgress = true;
-                _singBox.Stop();
-                _proxy.Restore();
-                _manualStopInProgress = false;
-                AppendLog("Previous runtime stopped. Windows system proxy restored before switching.");
+                await StopActiveConnectionForSwitchAsync();
+            }
+
+            if (ProfileKinds.IsRasProfile(profile))
+            {
+                await _rasDial.ConnectAsync(profile, AppendLog);
+                _activeProfile = profile;
+                _selectedProfile = profile;
+                _isConnected = true;
+                _isBusy = false;
+                _store.MarkUsed(profile);
+                _healthStatus = ProxyHealthStatus.VpnConnected(profile.Name);
+                AppendLog($"Windows RAS VPN connected: {profile.Name}");
+                RefreshAll();
+                return;
             }
 
             _localProxyPort = PortGuard.FirstAvailablePort();
@@ -1042,8 +1135,15 @@ internal sealed class MainWindow : Window
             try
             {
                 _manualStopInProgress = true;
-                _singBox.Stop();
-                _proxy.Restore();
+                if (ProfileKinds.IsRasProfile(profile))
+                {
+                    await _rasDial.DisconnectAsync(profile, AppendLog);
+                }
+                else
+                {
+                    _singBox.Stop();
+                    _proxy.Restore();
+                }
             }
             catch (Exception cleanupError)
             {
@@ -1059,14 +1159,45 @@ internal sealed class MainWindow : Window
         }
     }
 
+    private async Task StopActiveConnectionForSwitchAsync()
+    {
+        _manualStopInProgress = true;
+        try
+        {
+            if (_activeProfile?.IsRasProfile() == true)
+            {
+                await _rasDial.DisconnectAsync(_activeProfile, AppendLog);
+                AppendLog("Previous Windows RAS VPN disconnected before switching.");
+            }
+            else
+            {
+                _singBox.Stop();
+                _proxy.Restore();
+                AppendLog("Previous runtime stopped. Windows system proxy restored before switching.");
+            }
+        }
+        finally
+        {
+            _manualStopInProgress = false;
+        }
+    }
+
     private void Disconnect(bool manual, bool fromClosing = false)
     {
         try
         {
             _manualStopInProgress = true;
-            _singBox.Stop();
-            _proxy.Restore();
-            if (!fromClosing) AppendLog("Disconnected. Windows system proxy restored.");
+            if (_activeProfile?.IsRasProfile() == true)
+            {
+                _rasDial.DisconnectAsync(_activeProfile, AppendLog).GetAwaiter().GetResult();
+                if (!fromClosing) AppendLog("Disconnected. Windows RAS VPN stopped.");
+            }
+            else
+            {
+                _singBox.Stop();
+                _proxy.Restore();
+                if (!fromClosing) AppendLog("Disconnected. Windows system proxy restored.");
+            }
         }
         catch (Exception ex)
         {

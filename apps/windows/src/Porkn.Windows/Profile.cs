@@ -28,15 +28,23 @@ internal sealed class Profile
 
     public static string MakeStableKey(Profile profile)
     {
+        var normalizedProtocol = profile.Protocol.ToLowerInvariant();
+        if (normalizedProtocol == "ras")
+        {
+            var entry = profile.Query.GetValueOrDefault("entry_name", profile.Host).Trim().ToLowerInvariant();
+            var phonebook = profile.Query.GetValueOrDefault("phonebook_path", profile.Query.GetValueOrDefault("source_phonebook_path", "")).Trim().ToLowerInvariant();
+            return string.Join('|', normalizedProtocol, entry, phonebook);
+        }
+
         var normalizedUser = Uri.UnescapeDataString(profile.Username ?? "").ToLowerInvariant();
         var normalizedHost = profile.Host.ToLowerInvariant();
         var normalizedPort = profile.Port > 0 ? profile.Port.ToString() : "";
         if (!string.IsNullOrWhiteSpace(normalizedHost) && normalizedHost != "unknown")
         {
-            return string.Join('|', profile.Protocol.ToLowerInvariant(), normalizedUser, normalizedHost, normalizedPort);
+            return string.Join('|', normalizedProtocol, normalizedUser, normalizedHost, normalizedPort);
         }
 
-        return string.Join('|', profile.Protocol.ToLowerInvariant(), NormalizeRawConfig(profile.RawConfig));
+        return string.Join('|', normalizedProtocol, NormalizeRawConfig(profile.RawConfig));
     }
 
     private static string NormalizeRawConfig(string rawConfig)

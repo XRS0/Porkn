@@ -23,6 +23,7 @@ internal sealed class ProxyHealthStatus
     public static ProxyHealthStatus NotChecked() => new();
     public static ProxyHealthStatus Checking() => new() { Kind = ProxyHealthKind.Checking, Title = "Checking protection", Detail = "Verifying local proxy and remote path…" };
     public static ProxyHealthStatus Protected(string ip) => new() { Kind = ProxyHealthKind.Protected, Title = "Protected", Detail = $"Proxy is reachable. Remote IP: {ip}" };
+    public static ProxyHealthStatus VpnConnected(string entryName) => new() { Kind = ProxyHealthKind.Protected, Title = "VPN connected", Detail = $"Windows RAS VPN entry is connected: {entryName}" };
     public static ProxyHealthStatus ProxyReachable() => new() { Kind = ProxyHealthKind.ProxyReachable, Title = "Proxy reachable", Detail = "Local proxy works, remote IP check returned no IP." };
     public static ProxyHealthStatus RemoteFailed(string message) => new() { Kind = ProxyHealthKind.RemoteCheckFailed, Title = "Remote check failed", Detail = message };
     public static ProxyHealthStatus LocalFailed(string message) => new() { Kind = ProxyHealthKind.LocalProxyFailed, Title = "Local proxy failed", Detail = message };
