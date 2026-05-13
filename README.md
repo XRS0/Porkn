@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.8
+v0.3.9
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.8
+https://github.com/XRS0/Porkn/releases/tag/v0.3.9
 ```
 
 Available release artifacts:
@@ -927,9 +927,26 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.8
+### v0.3.9
 
 Current release.
+
+Added:
+
+* Windows VPN Chain settings tab for chaining a normal System Proxy profile with a PBK/RAS VPN profile;
+* chain connect flow: base VLESS/SOCKS/Trojan/subscription profile starts first, then PBK/RAS is attached through `rasdial.exe`;
+* configurable delay before the PBK/RAS layer;
+* chain status display and action to detach only the PBK layer while keeping the base proxy active.
+
+Fixed / improved:
+
+* PBK import now avoids importing generic dial-up entries that only have `PhoneNumber`;
+* PBK text decoding now handles UTF-16 BOM, UTF-8 BOM, UTF-8 and legacy Windows encoding fallback;
+* PBK stable identity now prefers the original source phonebook path to avoid duplicate profiles after re-importing updated PBK files;
+* `rasdial.exe` calls now have timeouts so credential/device hangs do not block porkn forever;
+* switching/disconnect now tears down chained PBK/RAS before stopping the base runtime.
+
+### v0.3.8
 
 Added:
 
