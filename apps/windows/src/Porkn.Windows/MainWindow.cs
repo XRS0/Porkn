@@ -1377,9 +1377,10 @@ internal sealed class MainWindow : Window
             .Where(IsSupportedChainNode)
             .OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        entryProfile = chainProfiles.FirstOrDefault(profile => profile.Id == Settings.VpnChain.EntryProfileId) ?? chainProfiles.FirstOrDefault();
-        exitProfile = chainProfiles.FirstOrDefault(profile => profile.Id == Settings.VpnChain.ExitProfileId && (entryProfile is null || profile.Id != entryProfile.Id))
-            ?? chainProfiles.FirstOrDefault(profile => entryProfile is null || profile.Id != entryProfile.Id);
+        var selectedEntry = chainProfiles.FirstOrDefault(profile => profile.Id == Settings.VpnChain.EntryProfileId) ?? chainProfiles.FirstOrDefault();
+        entryProfile = selectedEntry;
+        exitProfile = chainProfiles.FirstOrDefault(profile => profile.Id == Settings.VpnChain.ExitProfileId && (selectedEntry is null || profile.Id != selectedEntry.Id))
+            ?? chainProfiles.FirstOrDefault(profile => selectedEntry is null || profile.Id != selectedEntry.Id);
     }
 
     private async Task ConnectProfileAsync(Profile profile, bool isSwitch)
