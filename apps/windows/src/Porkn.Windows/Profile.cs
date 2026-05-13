@@ -32,7 +32,7 @@ internal sealed class Profile
         if (normalizedProtocol == "ras")
         {
             var entry = profile.Query.GetValueOrDefault("entry_name", profile.Host).Trim().ToLowerInvariant();
-            var phonebook = profile.Query.GetValueOrDefault("phonebook_path", profile.Query.GetValueOrDefault("source_phonebook_path", "")).Trim().ToLowerInvariant();
+            var phonebook = profile.Query.GetValueOrDefault("source_phonebook_path", profile.Query.GetValueOrDefault("phonebook_path", "")).Trim().ToLowerInvariant();
             return string.Join('|', normalizedProtocol, entry, phonebook);
         }
 

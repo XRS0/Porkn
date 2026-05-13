@@ -39,12 +39,31 @@ internal static class RasPhonebookImporter
 
     private static List<Profile> ParseProfiles(string managedPath, string sourcePath)
     {
-        var text = File.ReadAllText(managedPath, Encoding.Default);
+        var text = ReadPhonebookText(managedPath);
         var sections = ParseSections(text);
         return sections
             .Where(section => IsLikelyVpnEntry(section.Values))
             .Select(section => ToProfile(section, managedPath, sourcePath))
             .ToList();
+    }
+
+    private static string ReadPhonebookText(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        if (bytes.Length >= 2)
+        {
+            if (bytes[0] == 0xFF && bytes[1] == 0xFE) return Encoding.Unicode.GetString(bytes);
+            if (bytes[0] == 0xFE && bytes[1] == 0xFF) return Encoding.BigEndianUnicode.GetString(bytes);
+        }
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) return Encoding.UTF8.GetString(bytes);
+        try
+        {
+            return new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetString(bytes);
+        }
+        catch (DecoderFallbackException)
+        {
+            return Encoding.Default.GetString(bytes);
+        }
     }
 
     private static bool IsLikelyVpnEntry(Dictionary<string, string> values)
@@ -53,7 +72,8 @@ internal static class RasPhonebookImporter
         if (values.TryGetValue("MEDIA", out var media) && media.Contains("vpn", StringComparison.OrdinalIgnoreCase)) return true;
         if (values.TryGetValue("Device", out var device) && device.Contains("vpn", StringComparison.OrdinalIgnoreCase)) return true;
         if (values.TryGetValue("Type", out var type) && type is "2" or "5") return true;
-        return values.ContainsKey("PhoneNumber") || values.ContainsKey("CustomDialDll");
+        if (values.ContainsKey("CustomDialDll")) return true;
+        return false;
     }
 
     private static Profile ToProfile(PbkSection section, string managedPath, string sourcePath)
@@ -149,7 +169,7 @@ internal sealed class RasDialManager
         arguments.Append(" /phonebook:").Append(Quote(phonebookPath));
 
         onLog($"Connecting Windows RAS VPN: {entryName}");
-        var result = await RunRasDialAsync(arguments.ToString(), cancellationToken);
+        var result = await RunRasDialAsync(arguments.ToString(), TimeSpan.FromSeconds(70), cancellationToken);
         LogOutput(result, onLog);
         if (result.ExitCode != 0) throw new InvalidOperationException($"rasdial failed with code {result.ExitCode}: {LastLine(result)}");
     }
@@ -161,7 +181,7 @@ internal sealed class RasDialManager
         var phonebookPath = PhonebookPath(profile);
         var arguments = $"{Quote(entryName)} /disconnect /phonebook:{Quote(phonebookPath)}";
         onLog($"Disconnecting Windows RAS VPN: {entryName}");
-        var result = await RunRasDialAsync(arguments, cancellationToken);
+        var result = await RunRasDialAsync(arguments, TimeSpan.FromSeconds(30), cancellationToken);
         LogOutput(result, onLog);
         if (result.ExitCode != 0)
         {
@@ -179,8 +199,11 @@ internal sealed class RasDialManager
         return path;
     }
 
-    private static async Task<RasDialResult> RunRasDialAsync(string arguments, CancellationToken cancellationToken)
+    private static async Task<RasDialResult> RunRasDialAsync(string arguments, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(timeout);
+
         using var process = new Process
         {
             StartInfo = new ProcessStartInfo
@@ -195,10 +218,27 @@ internal sealed class RasDialManager
         };
 
         if (!process.Start()) throw new InvalidOperationException("Unable to start rasdial.exe");
-        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
+        var stderrTask = process.StandardError.ReadToEndAsync(timeoutCts.Token);
+        try
+        {
+            await process.WaitForExitAsync(timeoutCts.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            TryKill(process);
+            throw new TimeoutException($"rasdial.exe timed out after {timeout.TotalSeconds:0} seconds");
+        }
         return new RasDialResult(process.ExitCode, await stdoutTask, await stderrTask);
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited) process.Kill(entireProcessTree: true);
+        }
+        catch { }
     }
 
     private static void LogOutput(RasDialResult result, Action<string> onLog)

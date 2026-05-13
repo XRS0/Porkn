@@ -34,6 +34,14 @@ internal enum RoutingPreset
     Custom
 }
 
+internal sealed class VpnChainSettings
+{
+    public bool Enabled { get; set; }
+    public Guid? BaseProfileId { get; set; }
+    public Guid? RasProfileId { get; set; }
+    public int DelaySeconds { get; set; } = 2;
+}
+
 internal sealed class AppSettings
 {
     public bool LaunchAtLogin { get; set; }
@@ -47,6 +55,7 @@ internal sealed class AppSettings
     public ProfileSortMode ProfileSortMode { get; set; } = ProfileSortMode.FavoritesFirst;
     public Guid? LastSelectedProfileId { get; set; }
     public RoutingSettings Routing { get; set; } = RoutingSettings.Default;
+    public VpnChainSettings VpnChain { get; set; } = new();
 }
 
 internal sealed class SettingsStore
@@ -77,6 +86,7 @@ internal sealed class SettingsStore
         {
             Settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath), _jsonOptions) ?? new AppSettings();
             Settings.Routing ??= RoutingSettings.Default;
+            Settings.VpnChain ??= new VpnChainSettings();
         }
         catch
         {

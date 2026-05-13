@@ -20,7 +20,8 @@ internal enum MainSelectionKind
 internal enum SettingsTab
 {
     General,
-    Routing
+    Routing,
+    VpnChain
 }
 
 internal sealed class MainWindow : Window
@@ -48,6 +49,7 @@ internal sealed class MainWindow : Window
     private SettingsTab _settingsTab = SettingsTab.General;
     private Profile? _selectedProfile;
     private Profile? _activeProfile;
+    private Profile? _chainedRasProfile;
     private ProxyHealthStatus _healthStatus = ProxyHealthStatus.NotChecked();
     private readonly List<string> _logLines = [];
     private bool _isConnected;
@@ -451,7 +453,7 @@ internal sealed class MainWindow : Window
 
     private Control BuildProfileRow(Profile profile)
     {
-        var connected = _isConnected && _activeProfile?.Id == profile.Id;
+        var connected = _isConnected && (_activeProfile?.Id == profile.Id || _chainedRasProfile?.Id == profile.Id);
         var selected = _selectionKind == MainSelectionKind.Profile && _selectedProfile?.Id == profile.Id;
         var accent = connected ? Ui.Green : Ui.SecondaryText;
         var rowBackground = connected ? Ui.GreenSoft : selected ? Ui.CardBackground : Ui.SidebarBackground;
@@ -600,7 +602,7 @@ internal sealed class MainWindow : Window
 
     private Control BuildConnectionCard(Profile profile)
     {
-        var connectedToThis = _isConnected && _activeProfile?.Id == profile.Id;
+        var connectedToThis = _isConnected && (_activeProfile?.Id == profile.Id || _chainedRasProfile?.Id == profile.Id);
         var top = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
         var info = new StackPanel { Spacing = 6 };
         info.Children.Add(Text(profile.Name, 22, FontWeight.SemiBold));
@@ -839,7 +841,13 @@ internal sealed class MainWindow : Window
             }
         });
         stack.Children.Add(BuildSettingsTabs());
-        stack.Children.Add(_settingsTab == SettingsTab.General ? BuildGeneralSettings() : BuildRoutingSettings());
+        stack.Children.Add(_settingsTab switch
+        {
+            SettingsTab.General => BuildGeneralSettings(),
+            SettingsTab.Routing => BuildRoutingSettings(),
+            SettingsTab.VpnChain => BuildVpnChainSettings(),
+            _ => BuildGeneralSettings()
+        });
         return new ScrollViewer { Content = new Border { Padding = new Thickness(56, 48, 60, 52), Child = stack } };
     }
 
@@ -852,7 +860,11 @@ internal sealed class MainWindow : Window
         routing.Background = _settingsTab == SettingsTab.Routing ? Ui.BlueSoft : Ui.CardBackground;
         routing.Click += (_, _) => { _settingsTab = SettingsTab.Routing; RefreshDetail(); };
         routing.Margin = new Thickness(10, 0, 0, 0);
-        return new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Children = { general, WithColumn(routing, 1) } };
+        var chain = SecondaryButton(T("VPN Chain", "VPN Chain"));
+        chain.Background = _settingsTab == SettingsTab.VpnChain ? Ui.BlueSoft : Ui.CardBackground;
+        chain.Click += (_, _) => { _settingsTab = SettingsTab.VpnChain; RefreshDetail(); };
+        chain.Margin = new Thickness(10, 0, 0, 0);
+        return new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), Children = { general, WithColumn(routing, 1), WithColumn(chain, 2) } };
     }
 
     private Control BuildGeneralSettings()
@@ -909,6 +921,96 @@ internal sealed class MainWindow : Window
             _settingsStore.Save();
         };
         stack.Children.Add(SettingsCard(T("Ядро", "Core"), T("Сейчас production runtime — bundled sing-box внутри приложения.", "Current production runtime is bundled sing-box inside the app."), core));
+        return stack;
+    }
+
+    private Control BuildVpnChainSettings()
+    {
+        Settings.VpnChain ??= new VpnChainSettings();
+        var stack = new StackPanel { Spacing = 16 };
+
+        var enabled = SettingCheckBox(
+            T("Включить VPN Chain", "Enable VPN Chain"),
+            T("porkn сначала подключит базовый System Proxy профиль, затем PBK/RAS VPN поверх него.", "porkn connects the base System Proxy profile first, then attaches PBK/RAS VPN on top."),
+            Settings.VpnChain.Enabled,
+            value => Settings.VpnChain.Enabled = value);
+        stack.Children.Add(SettingsCard(
+            T("Режим", "Mode"),
+            T("Нужен для сценария: обычный proxy/VLESS/SOCKS/Trojan профиль → затем Windows PBK VPN.", "Use this for: normal proxy/VLESS/SOCKS/Trojan profile → then Windows PBK VPN."),
+            enabled));
+
+        var baseProfiles = _store.Profiles.Where(profile => !profile.IsRasProfile()).OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var rasProfiles = _store.Profiles.Where(profile => profile.IsRasProfile()).OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        var basePicker = new ComboBox
+        {
+            ItemsSource = baseProfiles.Count == 0
+                ? new[] { T("Нет обычных профилей", "No normal profiles") }
+                : baseProfiles.Select(ChainProfileTitle).ToList(),
+            SelectedIndex = Math.Max(0, baseProfiles.FindIndex(profile => profile.Id == Settings.VpnChain.BaseProfileId)),
+            IsEnabled = baseProfiles.Count > 0
+        };
+        StyleComboBox(basePicker);
+        basePicker.SelectionChanged += (_, _) =>
+        {
+            if (basePicker.SelectedIndex >= 0 && basePicker.SelectedIndex < baseProfiles.Count)
+            {
+                Settings.VpnChain.BaseProfileId = baseProfiles[basePicker.SelectedIndex].Id;
+                _settingsStore.Save();
+            }
+        };
+
+        var rasPicker = new ComboBox
+        {
+            ItemsSource = rasProfiles.Count == 0
+                ? new[] { T("Нет PBK/RAS профилей", "No PBK/RAS profiles") }
+                : rasProfiles.Select(ChainProfileTitle).ToList(),
+            SelectedIndex = Math.Max(0, rasProfiles.FindIndex(profile => profile.Id == Settings.VpnChain.RasProfileId)),
+            IsEnabled = rasProfiles.Count > 0
+        };
+        StyleComboBox(rasPicker);
+        rasPicker.SelectionChanged += (_, _) =>
+        {
+            if (rasPicker.SelectedIndex >= 0 && rasPicker.SelectedIndex < rasProfiles.Count)
+            {
+                Settings.VpnChain.RasProfileId = rasProfiles[rasPicker.SelectedIndex].Id;
+                _settingsStore.Save();
+            }
+        };
+
+        var delayValues = new[] { 0, 1, 2, 3, 5, 8, 10 };
+        var delayPicker = new ComboBox
+        {
+            ItemsSource = delayValues.Select(value => T($"{value} сек", $"{value} sec")).ToList(),
+            SelectedIndex = Math.Max(0, Array.IndexOf(delayValues, Settings.VpnChain.DelaySeconds))
+        };
+        StyleComboBox(delayPicker);
+        delayPicker.SelectionChanged += (_, _) =>
+        {
+            if (delayPicker.SelectedIndex >= 0 && delayPicker.SelectedIndex < delayValues.Length)
+            {
+                Settings.VpnChain.DelaySeconds = delayValues[delayPicker.SelectedIndex];
+                _settingsStore.Save();
+            }
+        };
+
+        var selectors = new StackPanel { Spacing = 12 };
+        selectors.Children.Add(FieldBlock(T("Базовый профиль", "Base profile"), T("Обычный профиль, который запускает sing-box и Windows system proxy.", "Normal profile that starts sing-box and Windows system proxy."), basePicker));
+        selectors.Children.Add(FieldBlock(T("PBK/RAS профиль", "PBK/RAS profile"), T("VPN entry из импортированного rasphone.pbk, подключается вторым шагом.", "VPN entry imported from rasphone.pbk, connected as the second step."), rasPicker));
+        selectors.Children.Add(FieldBlock(T("Задержка перед PBK", "Delay before PBK"), T("Небольшая пауза даёт базовому proxy полностью подняться перед rasdial.", "A short pause lets the base proxy settle before rasdial starts."), delayPicker));
+        stack.Children.Add(SettingsCard(T("Профили цепочки", "Chain profiles"), T("Выбери два профиля: сначала обычный, затем PBK/RAS.", "Pick two profiles: normal first, PBK/RAS second."), selectors));
+
+        var actions = new StackPanel { Spacing = 10 };
+        actions.Children.Add(Text(ChainStatusText(), 12, FontWeight.Normal, Ui.SecondaryText));
+        var connect = PrimaryButton(T("Подключить VPN Chain", "Connect VPN Chain"), Ui.Green);
+        connect.IsEnabled = baseProfiles.Count > 0 && rasProfiles.Count > 0 && !_isBusy;
+        connect.Click += async (_, _) => await ConnectConfiguredChainAsync();
+        var detach = SecondaryButton(T("Отключить PBK слой", "Detach PBK layer"), Ui.Red);
+        detach.IsEnabled = _chainedRasProfile is not null && !_isBusy;
+        detach.Click += async (_, _) => await DisconnectChainedRasAsync(T("PBK слой отключён.", "PBK layer detached."));
+        actions.Children.Add(new Grid { ColumnDefinitions = new ColumnDefinitions("*,*"), Children = { connect, WithColumn(detach, 1) } });
+        stack.Children.Add(SettingsCard(T("Управление", "Control"), T("Можно подключить всю цепочку отсюда или отключить только PBK слой, оставив базовый proxy активным.", "Connect the whole chain here or detach only the PBK layer while keeping the base proxy active."), actions));
+
         return stack;
     }
 
@@ -1008,6 +1110,17 @@ internal sealed class MainWindow : Window
         return new StackPanel { Spacing = 6, Children = { Text(title, 13, FontWeight.SemiBold), Text(subtitle, 11, FontWeight.Normal, Ui.SecondaryText), text } };
     }
 
+    private Control FieldBlock(string title, string subtitle, Control control) => new StackPanel
+    {
+        Spacing = 6,
+        Children =
+        {
+            Text(title, 13, FontWeight.SemiBold),
+            Text(subtitle, 11, FontWeight.Normal, Ui.SecondaryText),
+            control
+        }
+    };
+
     private void AddPresetButton(Grid grid, int column, string title, Action action)
     {
         var button = SecondaryButton(title);
@@ -1105,6 +1218,91 @@ internal sealed class MainWindow : Window
         RefreshAll();
     }
 
+    private async Task ConnectConfiguredChainAsync()
+    {
+        Settings.VpnChain ??= new VpnChainSettings();
+        Settings.VpnChain.Enabled = true;
+        ResolveConfiguredChainProfiles(out var baseProfile, out var rasProfile);
+        if (baseProfile is null || rasProfile is null)
+        {
+            AppendLog(T("VPN Chain не настроен: выбери базовый и PBK/RAS профиль.", "VPN Chain is not configured: choose base and PBK/RAS profiles."));
+            RefreshAll();
+            return;
+        }
+
+        Settings.VpnChain.BaseProfileId = baseProfile.Id;
+        Settings.VpnChain.RasProfileId = rasProfile.Id;
+        _settingsStore.Save();
+
+        if (_isConnected && _activeProfile?.Id == baseProfile.Id && !_activeProfile.IsRasProfile())
+        {
+            await MaybeConnectConfiguredChainAsync(baseProfile, force: true);
+            return;
+        }
+
+        await ConnectProfileAsync(baseProfile, isSwitch: _isConnected);
+    }
+
+    private async Task MaybeConnectConfiguredChainAsync(Profile baseProfile, bool force = false)
+    {
+        Settings.VpnChain ??= new VpnChainSettings();
+        if (!force && !Settings.VpnChain.Enabled) return;
+        if (baseProfile.IsRasProfile()) return;
+
+        ResolveConfiguredChainProfiles(out var configuredBase, out var rasProfile);
+        if (configuredBase is null || rasProfile is null) return;
+        if (configuredBase.Id != baseProfile.Id) return;
+        if (_chainedRasProfile?.Id == rasProfile.Id) return;
+
+        try
+        {
+            if (_chainedRasProfile is not null)
+            {
+                await DisconnectChainedRasAsync(T("Предыдущий PBK слой отключён перед новым VPN Chain.", "Previous PBK layer disconnected before new VPN Chain."));
+            }
+
+            var delay = Math.Clamp(Settings.VpnChain.DelaySeconds, 0, 30);
+            if (delay > 0)
+            {
+                AppendLog(T($"VPN Chain: жду {delay} сек перед PBK/RAS.", $"VPN Chain: waiting {delay} sec before PBK/RAS."));
+                await Task.Delay(TimeSpan.FromSeconds(delay));
+            }
+
+            AppendLog(T($"VPN Chain: подключаю PBK/RAS слой {rasProfile.Name}.", $"VPN Chain: connecting PBK/RAS layer {rasProfile.Name}."));
+            await _rasDial.ConnectAsync(rasProfile, AppendRuntimeLog);
+            _chainedRasProfile = rasProfile;
+            _store.MarkUsed(rasProfile);
+            AppendLog(T($"VPN Chain активен: {baseProfile.Name} → {rasProfile.Name}", $"VPN Chain active: {baseProfile.Name} → {rasProfile.Name}"));
+            RefreshAll();
+        }
+        catch (Exception ex)
+        {
+            _chainedRasProfile = null;
+            _healthStatus = ProxyHealthStatus.RemoteFailed(T("Базовый proxy подключён, но PBK/RAS слой не поднялся.", "Base proxy is connected, but PBK/RAS layer did not start."));
+            AppendLog(T("VPN Chain PBK/RAS ошибка: ", "VPN Chain PBK/RAS error: ") + ex.Message);
+            RefreshAll();
+        }
+    }
+
+    private async Task DisconnectChainedRasAsync(string? message = null)
+    {
+        if (_chainedRasProfile is null) return;
+        var profile = _chainedRasProfile;
+        _chainedRasProfile = null;
+        await _rasDial.DisconnectAsync(profile, AppendRuntimeLog);
+        if (!string.IsNullOrWhiteSpace(message)) AppendLog(message);
+        RefreshAll();
+    }
+
+    private void ResolveConfiguredChainProfiles(out Profile? baseProfile, out Profile? rasProfile)
+    {
+        Settings.VpnChain ??= new VpnChainSettings();
+        var normalProfiles = _store.Profiles.Where(profile => !profile.IsRasProfile()).OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        var rasProfiles = _store.Profiles.Where(profile => profile.IsRasProfile()).OrderBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        baseProfile = normalProfiles.FirstOrDefault(profile => profile.Id == Settings.VpnChain.BaseProfileId) ?? normalProfiles.FirstOrDefault();
+        rasProfile = rasProfiles.FirstOrDefault(profile => profile.Id == Settings.VpnChain.RasProfileId) ?? rasProfiles.FirstOrDefault();
+    }
+
     private async Task ConnectProfileAsync(Profile profile, bool isSwitch)
     {
         if (_isBusy) return;
@@ -1147,18 +1345,20 @@ internal sealed class MainWindow : Window
 
             _healthStatus = await _healthCheck.CheckAsync(LocalProxyHost, _localProxyPort);
             RefreshAll();
+            await MaybeConnectConfiguredChainAsync(profile);
         }
         catch (Exception ex)
         {
             _isBusy = false;
             _isConnected = false;
             _activeProfile = null;
+            _chainedRasProfile = null;
             try
             {
                 _manualStopInProgress = true;
                 if (ProfileKinds.IsRasProfile(profile))
                 {
-                    await _rasDial.DisconnectAsync(profile, AppendLog);
+                        await _rasDial.DisconnectAsync(profile, AppendRuntimeLog);
                 }
                 else
                 {
@@ -1185,6 +1385,13 @@ internal sealed class MainWindow : Window
         _manualStopInProgress = true;
         try
         {
+            if (_chainedRasProfile is not null)
+            {
+                await _rasDial.DisconnectAsync(_chainedRasProfile, AppendRuntimeLog);
+                _chainedRasProfile = null;
+                AppendLog(T("PBK слой VPN Chain отключён перед переключением.", "VPN Chain PBK layer disconnected before switching."));
+            }
+
             if (_activeProfile?.IsRasProfile() == true)
             {
                 await _rasDial.DisconnectAsync(_activeProfile, AppendRuntimeLog);
@@ -1208,6 +1415,13 @@ internal sealed class MainWindow : Window
         try
         {
             _manualStopInProgress = true;
+            if (_chainedRasProfile is not null)
+            {
+                _rasDial.DisconnectAsync(_chainedRasProfile, AppendRuntimeLog).GetAwaiter().GetResult();
+                _chainedRasProfile = null;
+                if (!fromClosing) AppendLog(T("PBK слой VPN Chain отключён.", "VPN Chain PBK layer disconnected."));
+            }
+
             if (_activeProfile?.IsRasProfile() == true)
             {
                 _rasDial.DisconnectAsync(_activeProfile, AppendRuntimeLog).GetAwaiter().GetResult();
@@ -1230,6 +1444,7 @@ internal sealed class MainWindow : Window
             _isBusy = false;
             _isConnected = false;
             _activeProfile = null;
+            _chainedRasProfile = null;
             _healthStatus = ProxyHealthStatus.NotChecked();
             if (!fromClosing) RefreshAll();
         }
@@ -1244,7 +1459,17 @@ internal sealed class MainWindow : Window
             AppendLog(T($"sing-box неожиданно завершился с кодом {exitCode}", $"sing-box exited unexpectedly with code {exitCode}"));
             _isConnected = false;
             _isBusy = false;
+            var chained = _chainedRasProfile;
             _activeProfile = null;
+            _chainedRasProfile = null;
+            if (chained is not null)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await _rasDial.DisconnectAsync(chained, AppendRuntimeLog); }
+                    catch (Exception ex) { AppendLog(T("Предупреждение отключения PBK слоя: ", "PBK layer disconnect warning: ") + ex.Message); }
+                });
+            }
             _healthStatus = ProxyHealthStatus.LocalFailed(T("sing-box неожиданно завершился.", "sing-box exited unexpectedly."));
             if (!Settings.KillSwitchEnabled)
             {
@@ -1382,6 +1607,15 @@ internal sealed class MainWindow : Window
     }
 
     private string T(string ru, string en) => L10n.Text(Settings.Language, ru, en);
+
+    private string ChainProfileTitle(Profile profile) => $"{profile.Name} · {profile.Protocol.ToUpperInvariant()} · {profile.Endpoint}";
+
+    private string ChainStatusText()
+    {
+        var baseName = _activeProfile is null ? T("нет базового подключения", "no base connection") : _activeProfile.Name;
+        var pbkName = _chainedRasProfile is null ? T("PBK слой не подключён", "PBK layer is not connected") : _chainedRasProfile.Name;
+        return T($"Сейчас: {baseName} → {pbkName}", $"Current: {baseName} → {pbkName}");
+    }
 
     private string ProfileSourceName(Profile profile)
     {
