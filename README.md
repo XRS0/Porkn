@@ -937,6 +937,7 @@ Added:
 * Entry → Exit chain model where PBK/RAS on Windows is only one supported node type, not a separate PBK-only mode;
 * macOS and Windows chaining for ordinary VLESS/SOCKS/Trojan nodes through `sing-box` outbound detour;
 * Windows mixed chains where one node may be a RAS/PBK profile connected through `rasdial.exe`;
+* safe Windows `normal node → RAS/PBK node → traffic` order: porkn starts the local runtime first, connects RAS/PBK second, and enables Windows system proxy only after the full chain is ready;
 * configurable delay between chain nodes for system VPN handoff scenarios;
 * chain status display and a single Connect / Disconnect VPN Chain control flow.
 
@@ -947,7 +948,8 @@ Fixed / improved:
 * PBK text decoding now handles UTF-16 BOM, UTF-8 BOM, UTF-8 and legacy Windows encoding fallback;
 * PBK stable identity now prefers the original source phonebook path to avoid duplicate profiles after re-importing updated PBK files;
 * `rasdial.exe` calls now have timeouts so credential/device hangs do not block porkn forever;
-* switching/disconnect now tears down any chained RAS/PBK node before stopping the normal runtime.
+* switching/disconnect now tears down any chained RAS/PBK node before stopping the normal runtime;
+* Windows mixed-chain failures clean up `sing-box` without enabling porkn system proxy prematurely.
 
 ### v0.3.8
 

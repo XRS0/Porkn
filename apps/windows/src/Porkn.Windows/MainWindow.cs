@@ -1004,7 +1004,7 @@ internal sealed class MainWindow : Window
 
         var selectors = new StackPanel { Spacing = 12 };
         selectors.Children.Add(FieldBlock(T("Entry узел", "Entry node"), T("Первый узел цепочки. Для обычных proxy это upstream outbound; для RAS/PBK — системное VPN подключение до запуска Exit.", "First chain node. For normal proxies it is an upstream outbound; for RAS/PBK it is a system VPN connection before Exit starts."), entryPicker));
-        selectors.Children.Add(FieldBlock(T("Exit узел", "Exit node"), T("Финальный узел, через который приложения будут выходить после локального proxy porkn.", "Final node used by apps after the local porkn proxy."), exitPicker));
+        selectors.Children.Add(FieldBlock(T("Exit узел", "Exit node"), T("Финальный узел. Если это PBK/RAS, Windows system proxy включится только после успешного подключения всей цепочки.", "Final node. If this is PBK/RAS, Windows system proxy is enabled only after the whole chain connects successfully."), exitPicker));
         selectors.Children.Add(FieldBlock(T("Пауза между узлами", "Delay between nodes"), T("Небольшая пауза полезна, когда один из узлов — системный RAS/PBK VPN.", "A short pause helps when one node is a system RAS/PBK VPN."), delayPicker));
         stack.Children.Add(SettingsCard(T("Узлы цепочки", "Chain nodes"), T("Выбери два разных узла. PBK/RAS не является отдельным режимом — это один из типов узла на Windows.", "Pick two different nodes. PBK/RAS is not a separate mode — it is one node type on Windows."), selectors));
 
@@ -1298,13 +1298,14 @@ internal sealed class MainWindow : Window
             }
             else if (exitProfile.IsRasProfile())
             {
-                StartSingBoxProfile(entryProfile, chainEntryProfile: null);
+                StartSingBoxProfile(entryProfile, chainEntryProfile: null, enableSystemProxy: false);
                 if (delay > 0) await DelayBetweenChainNodesAsync(delay);
                 AppendLog(T($"VPN Chain: подключаю Exit RAS/PBK узел {exitProfile.Name}.", $"VPN Chain: connecting Exit RAS/PBK node {exitProfile.Name}."));
                 await _rasDial.ConnectAsync(exitProfile, AppendRuntimeLog);
                 _chainedRasProfile = exitProfile;
                 _store.MarkUsed(exitProfile);
-                AppendLog(T($"VPN Chain активен: {entryProfile.Name} → {exitProfile.Name}", $"VPN Chain active: {entryProfile.Name} → {exitProfile.Name}"));
+                EnableSystemProxy();
+                AppendLog(T($"VPN Chain активен: {entryProfile.Name} → {exitProfile.Name}. Windows system proxy включён только после полной цепочки.", $"VPN Chain active: {entryProfile.Name} → {exitProfile.Name}. Windows system proxy enabled only after the full chain is ready."));
             }
             else
             {
@@ -1320,9 +1321,7 @@ internal sealed class MainWindow : Window
             _store.MarkUsed(exitProfile);
             RefreshAll();
 
-            _healthStatus = exitProfile.IsRasProfile()
-                ? ProxyHealthStatus.VpnConnected(exitProfile.Name)
-                : await _healthCheck.CheckAsync(LocalProxyHost, _localProxyPort);
+            _healthStatus = await _healthCheck.CheckAsync(LocalProxyHost, _localProxyPort);
             RefreshAll();
         }
         catch (Exception ex)
@@ -1359,12 +1358,18 @@ internal sealed class MainWindow : Window
         await Task.Delay(TimeSpan.FromSeconds(delay));
     }
 
-    private void StartSingBoxProfile(Profile profile, Profile? chainEntryProfile)
+    private void StartSingBoxProfile(Profile profile, Profile? chainEntryProfile, bool enableSystemProxy = true)
     {
         if (profile.IsRasProfile()) throw new InvalidOperationException("RAS/PBK profile cannot be generated as sing-box outbound");
         if (chainEntryProfile?.IsRasProfile() == true) throw new InvalidOperationException("RAS/PBK profile cannot be generated as sing-box chain outbound");
         _localProxyPort = PortGuard.FirstAvailablePort();
         _singBox.Start(profile, _localProxyPort, Settings.Routing, AppendRuntimeLog, OnSingBoxExited, chainEntryProfile);
+        if (enableSystemProxy) EnableSystemProxy();
+        else AppendLog(T($"sing-box готов на {LocalProxyHost}:{_localProxyPort}; Windows system proxy будет включён после второго узла цепочки.", $"sing-box is ready at {LocalProxyHost}:{_localProxyPort}; Windows system proxy will be enabled after the second chain node."));
+    }
+
+    private void EnableSystemProxy()
+    {
         _proxy.Enable(LocalProxyHost, _localProxyPort);
         AppendLog(T($"Windows system proxy включён: {LocalProxyHost}:{_localProxyPort}", $"Windows system proxy enabled: {LocalProxyHost}:{_localProxyPort}"));
     }
