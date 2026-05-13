@@ -37,13 +37,13 @@ Full VPN/TUN mode is planned and already has a safe skeleton, but it is **not pr
 The latest release is:
 
 ```text
-v0.3.10
+v0.3.11
 ```
 
 Release page:
 
 ```text
-https://github.com/XRS0/Porkn/releases/tag/v0.3.10
+https://github.com/XRS0/Porkn/releases/tag/v0.3.11
 ```
 
 Available release artifacts:
@@ -800,7 +800,7 @@ script/package_release.sh
 Example:
 
 ```bash
-APP_VERSION=0.3.10 \
+APP_VERSION=0.3.11 \
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 ./script/package_release.sh
 ```
@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.10 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.11 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -927,9 +927,20 @@ FTPPassive : 1
 
 ## Release history
 
-### v0.3.10
+### v0.3.11
 
 Current release.
+
+Fixed / improved:
+
+* Windows `rasdial.exe` output is decoded with the Windows OEM code page, so Russian PBK/RAS errors no longer appear as mojibake;
+* Windows RAS error `809` now shows a clear explanation instead of a misleading `Local proxy failed` message;
+* VPN Chain failures now use a dedicated `VPN Chain failed` status in the UI;
+* Windows PBK/RAS error text now explains the important limitation: RAS/PBK does not use porkn System Proxy for its own handshake, so forcing the PBK handshake through another node requires a real TUN/full-VPN layer.
+
+### v0.3.10
+
+Previous release.
 
 Fixed / improved:
 
