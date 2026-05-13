@@ -8,13 +8,13 @@ internal sealed class SingBoxProcessManager
 
     public bool IsRunning => _process?.HasExited == false;
 
-    public void Start(Profile profile, int localProxyPort, RoutingSettings routingSettings, Action<string> onLog, Action<int>? onExited = null)
+    public void Start(Profile profile, int localProxyPort, RoutingSettings routingSettings, Action<string> onLog, Action<int>? onExited = null, Profile? chainEntryProfile = null)
     {
         if (IsRunning) throw new InvalidOperationException("sing-box is already running");
 
         Directory.CreateDirectory(AppPaths.RuntimeDirectory);
         var configPath = Path.Combine(AppPaths.RuntimeDirectory, "active-sing-box.json");
-        File.WriteAllText(configPath, SingBoxConfigGenerator.Generate(profile, localProxyPort, routingSettings));
+        File.WriteAllText(configPath, SingBoxConfigGenerator.Generate(profile, localProxyPort, routingSettings, chainEntryProfile));
 
         var binary = ResolveSingBoxBinary();
         var process = new Process

@@ -21,10 +21,14 @@ struct ContentView: View {
       switch selection {
       case .settings:
         MainSettingsView(
-          connectedProfile: tunnelController.currentProfile(in: profileStore.profiles)
-        ) { profile in
-          Task { await tunnelController.switchTo(profile: profile, mode: .localProxy, force: true) }
-        }
+          connectedProfile: tunnelController.currentProfile(in: profileStore.profiles),
+          reconnectAction: { profile in
+            Task { await tunnelController.switchTo(profile: profile, mode: .localProxy, force: true) }
+          },
+          chainConnectAction: { entry, exit in
+            Task { await tunnelController.connectChain(entryProfile: entry, exitProfile: exit) }
+          }
+        )
       case .profile(let id):
         DetailView(profile: profileStore.profiles.first { $0.id == id })
       case nil:
@@ -120,6 +124,18 @@ struct ContentView: View {
     lastSelectedProfileID = newID
     profileStore.selectedProfileID = newID
     profileStore.markUsed(newID)
+
+    if tunnelController.state.isActive,
+      UserDefaults.standard.bool(forKey: "vpnChainEnabled"),
+      let entryID = UUID(uuidString: UserDefaults.standard.string(forKey: "vpnChainEntryProfileID") ?? ""),
+      let exitID = UUID(uuidString: UserDefaults.standard.string(forKey: "vpnChainExitProfileID") ?? ""),
+      newID == exitID,
+      let entry = profileStore.profiles.first(where: { $0.id == entryID }),
+      let exit = profileStore.profiles.first(where: { $0.id == exitID })
+    {
+      Task { await tunnelController.connectChain(entryProfile: entry, exitProfile: exit) }
+      return
+    }
 
     guard tunnelController.state.isActive,
       tunnelController.currentProfileID != newID,

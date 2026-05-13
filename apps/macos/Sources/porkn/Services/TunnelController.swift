@@ -32,6 +32,19 @@ final class TunnelController: ObservableObject {
     await connectWithinCurrentTransition(profile, mode: mode, transitionID: transitionID)
   }
 
+  func connectChain(entryProfile: TunnelProfile, exitProfile: TunnelProfile, mode: RoutingMode = .localProxy) async {
+    let transitionID = beginTransition()
+    defer { endTransition(transitionID) }
+
+    if let previousProfile = currentProfile, state.isActive || state.isTransitioning {
+      state = .switching(from: previousProfile, to: exitProfile)
+      appendLog("VPN Chain: переключение на цепочку \(entryProfile.name) → \(exitProfile.name)")
+      stopRuntimeAndRestoreProxy(logPrefix: "Останавливаю старое подключение")
+    }
+
+    await connectWithinCurrentTransition(exitProfile, mode: mode, transitionID: transitionID, chainEntryProfile: entryProfile)
+  }
+
   func disconnect() async {
     let transitionID = beginTransition()
     defer { endTransition(transitionID) }
@@ -84,7 +97,7 @@ final class TunnelController: ObservableObject {
   }
 
   private func connectWithinCurrentTransition(
-    _ profile: TunnelProfile, mode: RoutingMode, transitionID: UUID
+    _ profile: TunnelProfile, mode: RoutingMode, transitionID: UUID, chainEntryProfile: TunnelProfile? = nil
   ) async {
     guard mode.isAvailable else {
       if mode == .systemTun {
@@ -96,16 +109,20 @@ final class TunnelController: ObservableObject {
 
     state = state.isTransitioning ? state : .connecting(profile)
     if case .switching = state {
-      appendLog("Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)")
+      appendLog(chainEntryProfile == nil
+        ? "Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)"
+        : "Подготавливаю VPN Chain: \(chainEntryProfile!.name) → \(profile.name)")
     } else {
       logLines.removeAll()
-      appendLog("Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)")
+      appendLog(chainEntryProfile == nil
+        ? "Подготавливаю \(profile.proto.displayName) конфиг для \(profile.endpoint)"
+        : "Подготавливаю VPN Chain: \(chainEntryProfile!.name) → \(profile.name)")
     }
 
     do {
       let runID = UUID()
       activeRunID = runID
-      let info = try processManager.start(profile: profile, mode: mode) { [weak self] line in
+      let info = try processManager.start(profile: profile, mode: mode, chainEntryProfile: chainEntryProfile) { [weak self] line in
         self?.appendLog(line)
       } onExit: { [weak self] status in
         self?.handleProcessExit(status: status, runID: runID)
@@ -117,6 +134,9 @@ final class TunnelController: ObservableObject {
           host: info.localProxyHost, port: info.localProxyPort)
         appendLog("macOS system proxy включён для: \(proxiedServices.joined(separator: ", "))")
         appendLog("sing-box запущен. Системный proxy: \(info.localProxyEndpoint)")
+        if let chainEntryProfile {
+          appendLog("VPN Chain активен: \(chainEntryProfile.name) → \(profile.name)")
+        }
       case .systemTun:
         appendLog("sing-box запущен в TUN-режиме")
       }

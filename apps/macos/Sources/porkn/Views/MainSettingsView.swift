@@ -3,6 +3,7 @@ import SwiftUI
 struct MainSettingsView: View {
   let connectedProfile: TunnelProfile?
   let reconnectAction: (TunnelProfile) -> Void
+  let chainConnectAction: (TunnelProfile, TunnelProfile) -> Void
 
   var body: some View {
     ScrollView {
@@ -16,7 +17,8 @@ struct MainSettingsView: View {
         }
 
         SettingsView(
-          isEmbedded: true, connectedProfile: connectedProfile, reconnectAction: reconnectAction
+          isEmbedded: true, connectedProfile: connectedProfile, reconnectAction: reconnectAction,
+          chainConnectAction: chainConnectAction
         )
         .padding(0)
       }

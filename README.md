@@ -912,7 +912,7 @@ Typical verification commands:
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ./script/build_and_run.sh --verify
-APP_VERSION=0.3.6 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
+APP_VERSION=0.3.9 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./script/package_release.sh
 codesign --verify --deep --strict /Users/rootix/Applications/porkn.app
 scutil --proxy
 ```
@@ -933,18 +933,21 @@ Current release.
 
 Added:
 
-* Windows VPN Chain settings tab for chaining a normal System Proxy profile with a PBK/RAS VPN profile;
-* chain connect flow: base VLESS/SOCKS/Trojan/subscription profile starts first, then PBK/RAS is attached through `rasdial.exe`;
-* configurable delay before the PBK/RAS layer;
-* chain status display and action to detach only the PBK layer while keeping the base proxy active.
+* universal VPN Chain settings tab on macOS and Windows;
+* Entry → Exit chain model where PBK/RAS on Windows is only one supported node type, not a separate PBK-only mode;
+* macOS and Windows chaining for ordinary VLESS/SOCKS/Trojan nodes through `sing-box` outbound detour;
+* Windows mixed chains where one node may be a RAS/PBK profile connected through `rasdial.exe`;
+* configurable delay between chain nodes for system VPN handoff scenarios;
+* chain status display and a single Connect / Disconnect VPN Chain control flow.
 
 Fixed / improved:
 
+* Windows VPN Chain UI no longer presents PBK as the main feature; it treats PBK/RAS as a regular chain node type;
 * PBK import now avoids importing generic dial-up entries that only have `PhoneNumber`;
 * PBK text decoding now handles UTF-16 BOM, UTF-8 BOM, UTF-8 and legacy Windows encoding fallback;
 * PBK stable identity now prefers the original source phonebook path to avoid duplicate profiles after re-importing updated PBK files;
 * `rasdial.exe` calls now have timeouts so credential/device hangs do not block porkn forever;
-* switching/disconnect now tears down chained PBK/RAS before stopping the base runtime.
+* switching/disconnect now tears down any chained RAS/PBK node before stopping the normal runtime.
 
 ### v0.3.8
 

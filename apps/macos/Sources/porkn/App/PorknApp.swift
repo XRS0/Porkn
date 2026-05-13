@@ -25,6 +25,8 @@ struct PorknApp: App {
 
     Settings {
       SettingsView()
+        .environmentObject(profileStore)
+        .environmentObject(tunnelController)
     }
 
     MenuBarExtra("porkn", systemImage: tunnelController.state.isActive ? "shield.fill" : "shield") {

@@ -11,7 +11,7 @@ internal static class SingBoxConfigGenerator
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static string Generate(Profile profile, int localProxyPort, RoutingSettings? routingSettings = null)
+    public static string Generate(Profile profile, int localProxyPort, RoutingSettings? routingSettings = null, Profile? chainEntryProfile = null)
     {
         routingSettings ??= RoutingSettings.Default;
         var routeRules = new List<Dictionary<string, object?>>
@@ -24,6 +24,19 @@ internal static class SingBoxConfigGenerator
             }
         };
         routeRules.AddRange(routingSettings.RouteRules().Select(rule => rule.ToDictionary(kv => kv.Key, kv => (object?)kv.Value)));
+
+        var outbounds = new List<Dictionary<string, object?>>();
+        if (chainEntryProfile is not null)
+        {
+            outbounds.Add(BuildOutbound(chainEntryProfile, "chain-entry"));
+            outbounds.Add(BuildOutbound(profile, "proxy-out", "chain-entry"));
+        }
+        else
+        {
+            outbounds.Add(BuildOutbound(profile));
+        }
+        outbounds.Add(new Dictionary<string, object?> { ["type"] = "direct", ["tag"] = "direct" });
+        outbounds.Add(new Dictionary<string, object?> { ["type"] = "block", ["tag"] = "block" });
 
         var config = new Dictionary<string, object?>
         {
@@ -59,12 +72,7 @@ internal static class SingBoxConfigGenerator
                     ["listen_port"] = localProxyPort
                 }
             },
-            ["outbounds"] = new object[]
-            {
-                BuildOutbound(profile),
-                new Dictionary<string, object?> { ["type"] = "direct", ["tag"] = "direct" },
-                new Dictionary<string, object?> { ["type"] = "block", ["tag"] = "block" }
-            },
+            ["outbounds"] = outbounds,
             ["route"] = new Dictionary<string, object?>
             {
                 ["auto_detect_interface"] = true,
@@ -81,20 +89,20 @@ internal static class SingBoxConfigGenerator
         return JsonSerializer.Serialize(config, JsonOptions);
     }
 
-    private static Dictionary<string, object?> BuildOutbound(Profile profile)
+    private static Dictionary<string, object?> BuildOutbound(Profile profile, string tag = "proxy-out", string? detour = null)
     {
         return profile.Protocol.ToLowerInvariant() switch
         {
-            "vless" => BuildVless(profile),
-            "trojan" => BuildTrojan(profile),
-            "socks" => BuildSocks(profile),
+            "vless" => BuildVless(profile, tag, detour),
+            "trojan" => BuildTrojan(profile, tag, detour),
+            "socks" => BuildSocks(profile, tag, detour),
             _ => throw new NotSupportedException($"sing-box generator does not support {profile.Protocol.ToUpperInvariant()} yet")
         };
     }
 
-    private static Dictionary<string, object?> BuildSocks(Profile profile)
+    private static Dictionary<string, object?> BuildSocks(Profile profile, string tag, string? detour)
     {
-        var outbound = BaseOutbound(profile, "socks");
+        var outbound = BaseOutbound(profile, "socks", tag, detour);
         outbound["version"] = profile.Query.GetValueOrDefault("version", "5");
         outbound["network"] = "tcp";
         if (!string.IsNullOrWhiteSpace(profile.Username)) outbound["username"] = profile.Username;
@@ -102,17 +110,17 @@ internal static class SingBoxConfigGenerator
         return outbound;
     }
 
-    private static Dictionary<string, object?> BuildTrojan(Profile profile)
+    private static Dictionary<string, object?> BuildTrojan(Profile profile, string tag, string? detour)
     {
-        var outbound = BaseOutbound(profile, "trojan");
+        var outbound = BaseOutbound(profile, "trojan", tag, detour);
         outbound["password"] = profile.Username ?? throw new InvalidOperationException("Trojan password is missing");
         outbound["tls"] = Tls(profile, defaultEnabled: true);
         return outbound;
     }
 
-    private static Dictionary<string, object?> BuildVless(Profile profile)
+    private static Dictionary<string, object?> BuildVless(Profile profile, string tag, string? detour)
     {
-        var outbound = BaseOutbound(profile, "vless");
+        var outbound = BaseOutbound(profile, "vless", tag, detour);
         outbound["uuid"] = profile.Username ?? throw new InvalidOperationException("VLESS UUID is missing");
         outbound["network"] = profile.Query.GetValueOrDefault("network", "tcp");
         outbound["packet_encoding"] = profile.Query.GetValueOrDefault("packetEncoding", "xudp");
@@ -124,13 +132,18 @@ internal static class SingBoxConfigGenerator
         return outbound;
     }
 
-    private static Dictionary<string, object?> BaseOutbound(Profile profile, string type) => new()
+    private static Dictionary<string, object?> BaseOutbound(Profile profile, string type, string tag, string? detour)
     {
-        ["type"] = type,
-        ["tag"] = "proxy-out",
-        ["server"] = profile.Host,
-        ["server_port"] = profile.Port
-    };
+        var outbound = new Dictionary<string, object?>
+        {
+            ["type"] = type,
+            ["tag"] = tag,
+            ["server"] = profile.Host,
+            ["server_port"] = profile.Port
+        };
+        if (!string.IsNullOrWhiteSpace(detour)) outbound["detour"] = detour;
+        return outbound;
+    }
 
     private static Dictionary<string, object?>? Tls(Profile profile, bool defaultEnabled = false)
     {

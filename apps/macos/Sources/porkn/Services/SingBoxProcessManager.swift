@@ -45,7 +45,8 @@ final class SingBoxProcessManager {
   }
 
   func start(
-    profile: TunnelProfile, mode: RoutingMode, onLog: @escaping @MainActor (String) -> Void,
+    profile: TunnelProfile, mode: RoutingMode, chainEntryProfile: TunnelProfile? = nil,
+    onLog: @escaping @MainActor (String) -> Void,
     onExit: @escaping @MainActor (Int32) -> Void
   ) throws -> SingBoxRuntimeInfo {
     guard process?.isRunning != true else { throw ManagerError.processAlreadyRunning }
@@ -66,7 +67,7 @@ final class SingBoxProcessManager {
     try FileManager.default.createDirectory(at: runtimeDirectory, withIntermediateDirectories: true)
     let configURL = runtimeDirectory.appendingPathComponent("active-sing-box.json")
     let config = try generator.generate(
-      profile: profile, mode: mode, localProxyPort: localProxyPort)
+      profile: profile, mode: mode, localProxyPort: localProxyPort, chainEntryProfile: chainEntryProfile)
     try config.write(to: configURL, atomically: true, encoding: .utf8)
 
     let stdout = Pipe()

@@ -37,9 +37,19 @@ internal enum RoutingPreset
 internal sealed class VpnChainSettings
 {
     public bool Enabled { get; set; }
+    public Guid? EntryProfileId { get; set; }
+    public Guid? ExitProfileId { get; set; }
+
+    // Legacy v0.3.9-preview fields. Kept so existing settings migrate instead of resetting.
     public Guid? BaseProfileId { get; set; }
     public Guid? RasProfileId { get; set; }
     public int DelaySeconds { get; set; } = 2;
+
+    public void MigrateLegacySelection()
+    {
+        EntryProfileId ??= BaseProfileId;
+        ExitProfileId ??= RasProfileId;
+    }
 }
 
 internal sealed class AppSettings
@@ -79,6 +89,7 @@ internal sealed class SettingsStore
         if (!File.Exists(_filePath))
         {
             Settings = new AppSettings();
+            Settings.VpnChain.MigrateLegacySelection();
             return;
         }
 
@@ -87,11 +98,14 @@ internal sealed class SettingsStore
             Settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath), _jsonOptions) ?? new AppSettings();
             Settings.Routing ??= RoutingSettings.Default;
             Settings.VpnChain ??= new VpnChainSettings();
+            Settings.VpnChain.MigrateLegacySelection();
         }
         catch
         {
             Settings = new AppSettings();
         }
+        Settings.VpnChain ??= new VpnChainSettings();
+        Settings.VpnChain.MigrateLegacySelection();
     }
 
     public void Save()

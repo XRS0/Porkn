@@ -2,9 +2,12 @@ import AppKit
 import SwiftUI
 
 struct SettingsView: View {
+  @EnvironmentObject private var profileStore: ProfileStore
+  @EnvironmentObject private var tunnelController: TunnelController
   var isEmbedded = false
   var connectedProfile: TunnelProfile?
   var reconnectAction: ((TunnelProfile) -> Void)?
+  var chainConnectAction: ((TunnelProfile, TunnelProfile) -> Void)?
   @AppStorage("launchAtLogin") private var launchAtLogin = false
   @AppStorage("autoConnectLastProfile") private var autoConnectLastProfile = false
   @AppStorage(KillSwitchPolicy.storageKey) private var killSwitchEnabled = false
@@ -19,6 +22,9 @@ struct SettingsView: View {
     RoutingSettings.defaultDirectDomainsText
   @AppStorage(RoutingSettings.proxyDomainsStorageKey) private var proxyDomainsText = ""
   @AppStorage(RoutingSettings.blockDomainsStorageKey) private var blockDomainsText = ""
+  @AppStorage("vpnChainEnabled") private var vpnChainEnabled = false
+  @AppStorage("vpnChainEntryProfileID") private var vpnChainEntryProfileID = ""
+  @AppStorage("vpnChainExitProfileID") private var vpnChainExitProfileID = ""
   @State private var selectedTab: SettingsTab = .general
   @State private var lastAppliedRoutingSettings = RoutingSettings.current
   @State private var routingImportError: String?
@@ -39,6 +45,8 @@ struct SettingsView: View {
           generalSettings
         case .routing:
           routingSettings
+        case .vpnChain:
+          vpnChainSettings
         }
       }
       .frame(maxWidth: .infinity, minHeight: isEmbedded ? 680 : 430, alignment: .topLeading)
@@ -438,6 +446,70 @@ struct SettingsView: View {
     }
   }
 
+  private var vpnChainSettings: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      VPNStyleSettingsCard(
+        title: t("VPN Chain", "VPN Chain"),
+        subtitle: t("Цепочка из двух обычных профилей: сначала entry, затем exit через него.", "Chain two normal profiles: entry first, then exit through it."),
+        systemImage: "link"
+      ) {
+        VStack(alignment: .leading, spacing: 12) {
+          Toggle(t("Включить VPN Chain", "Enable VPN Chain"), isOn: $vpnChainEnabled)
+            .toggleStyle(.switch)
+
+          Text(t("PBK не используется на macOS. Цепочка собирается внутри sing-box через outbound detour: подключение к exit-серверу идёт через entry-профиль.", "PBK is not used on macOS. The chain is built inside sing-box through outbound detour: the exit server is reached through the entry profile."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+
+      VPNStyleSettingsCard(
+        title: t("Профили цепочки", "Chain profiles"),
+        subtitle: t("Entry должен быть первым VPN/proxy, Exit — вторым финальным выходом.", "Entry is the first VPN/proxy, Exit is the second final egress."),
+        systemImage: "point.3.connected.trianglepath.dotted"
+      ) {
+        VStack(alignment: .leading, spacing: 14) {
+          Picker(t("Entry profile", "Entry profile"), selection: $vpnChainEntryProfileID) {
+            Text(t("Авто", "Auto")).tag("")
+            ForEach(chainProfiles) { profile in
+              Text(chainProfileTitle(profile)).tag(profile.id.uuidString)
+            }
+          }
+          .pickerStyle(.menu)
+
+          Picker(t("Exit profile", "Exit profile"), selection: $vpnChainExitProfileID) {
+            Text(t("Авто", "Auto")).tag("")
+            ForEach(chainProfiles) { profile in
+              Text(chainProfileTitle(profile)).tag(profile.id.uuidString)
+            }
+          }
+          .pickerStyle(.menu)
+        }
+      }
+
+      VPNStyleSettingsCard(
+        title: t("Управление", "Control"),
+        subtitle: t("Подключи цепочку одной кнопкой. Текущий runtime будет заменён chain-конфигом.", "Connect the chain with one button. The current runtime will be replaced by the chain config."),
+        systemImage: "power"
+      ) {
+        VStack(alignment: .leading, spacing: 10) {
+          Text(vpnChainStatusText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+          Button {
+            connectVpnChain()
+          } label: {
+            Label(t("Подключить VPN Chain", "Connect VPN Chain"), systemImage: "link.badge.plus")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(.green)
+          .disabled(resolvedChainProfiles == nil)
+        }
+      }
+    }
+  }
+
   private var currentRoutingPreset: RoutingPreset {
     RoutingPreset(rawValue: routingPresetRaw) ?? .directRuSu
   }
@@ -475,6 +547,41 @@ struct SettingsView: View {
     return parsed.map { "*.\($0)" }.joined(separator: "\n")
   }
 
+  private var chainProfiles: [TunnelProfile] {
+    profileStore.profiles.filter { $0.serverPort != nil && $0.proto != .unknown }
+  }
+
+  private var resolvedChainProfiles: (entry: TunnelProfile, exit: TunnelProfile)? {
+    let entry = chainProfiles.first { $0.id.uuidString == vpnChainEntryProfileID } ?? chainProfiles.first
+    let exit = chainProfiles.first { $0.id.uuidString == vpnChainExitProfileID && $0.id != entry?.id }
+      ?? chainProfiles.first { $0.id != entry?.id }
+    guard let entry, let exit else { return nil }
+    return (entry, exit)
+  }
+
+  private var vpnChainStatusText: String {
+    guard let resolvedChainProfiles else {
+      return t("Нужно минимум два обычных профиля.", "At least two normal profiles are required.")
+    }
+    return t("Цепочка: \(resolvedChainProfiles.entry.name) → \(resolvedChainProfiles.exit.name)", "Chain: \(resolvedChainProfiles.entry.name) → \(resolvedChainProfiles.exit.name)")
+  }
+
+  private func chainProfileTitle(_ profile: TunnelProfile) -> String {
+    "\(profile.name) · \(profile.proto.displayName) · \(profile.endpoint)"
+  }
+
+  private func connectVpnChain() {
+    guard let resolvedChainProfiles else { return }
+    vpnChainEnabled = true
+    vpnChainEntryProfileID = resolvedChainProfiles.entry.id.uuidString
+    vpnChainExitProfileID = resolvedChainProfiles.exit.id.uuidString
+    if let chainConnectAction {
+      chainConnectAction(resolvedChainProfiles.entry, resolvedChainProfiles.exit)
+    } else {
+      Task { await tunnelController.connectChain(entryProfile: resolvedChainProfiles.entry, exitProfile: resolvedChainProfiles.exit) }
+    }
+  }
+
   private func exportRoutingToClipboard() {
     routingImportError = nil
     do {
@@ -507,6 +614,7 @@ struct SettingsView: View {
 private enum SettingsTab: String, CaseIterable, Identifiable {
   case general
   case routing
+  case vpnChain
 
   var id: String { rawValue }
 
@@ -514,6 +622,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     switch self {
     case .general: "Основные"
     case .routing: "Routing"
+    case .vpnChain: "VPN Chain"
     }
   }
 
@@ -521,6 +630,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
     switch self {
     case .general: "gearshape"
     case .routing: "point.topleft.down.curvedto.point.bottomright.up"
+    case .vpnChain: "link"
     }
   }
 }

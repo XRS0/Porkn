@@ -18,10 +18,11 @@ struct SingBoxConfigGenerator {
 
   func generate(
     profile: TunnelProfile, mode: RoutingMode, routingSettings: RoutingSettings = .current,
-    localProxyPort: Int = PorknManagedProxy.defaultPort
+    localProxyPort: Int = PorknManagedProxy.defaultPort, chainEntryProfile: TunnelProfile? = nil
   ) throws -> String {
     let object = try generateObject(
-      profile: profile, mode: mode, routingSettings: routingSettings, localProxyPort: localProxyPort
+      profile: profile, mode: mode, routingSettings: routingSettings, localProxyPort: localProxyPort,
+      chainEntryProfile: chainEntryProfile
     )
     let data = try JSONSerialization.data(
       withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
@@ -30,9 +31,10 @@ struct SingBoxConfigGenerator {
 
   func generateObject(
     profile: TunnelProfile, mode: RoutingMode, routingSettings: RoutingSettings = .current,
-    localProxyPort: Int = PorknManagedProxy.defaultPort
+    localProxyPort: Int = PorknManagedProxy.defaultPort, chainEntryProfile: TunnelProfile? = nil
   ) throws -> [String: Any] {
     let routeRules = routeRules(mode: mode, routingSettings: routingSettings)
+    let outbounds = try outbounds(profile: profile, chainEntryProfile: chainEntryProfile)
 
     return [
       "log": [
@@ -59,11 +61,7 @@ struct SingBoxConfigGenerator {
         "final": "cloudflare",
       ],
       "inbounds": [inbound(mode: mode, localProxyPort: localProxyPort)],
-      "outbounds": [
-        try outbound(profile: profile),
-        ["type": "direct", "tag": "direct"],
-        ["type": "block", "tag": "block"],
-      ],
+      "outbounds": outbounds,
       "route": [
         "auto_detect_interface": true,
         "default_domain_resolver": [
@@ -120,7 +118,20 @@ struct SingBoxConfigGenerator {
     }
   }
 
-  private func outbound(profile: TunnelProfile) throws -> [String: Any] {
+  private func outbounds(profile: TunnelProfile, chainEntryProfile: TunnelProfile?) throws -> [[String: Any]] {
+    var result: [[String: Any]] = []
+    if let chainEntryProfile {
+      result.append(try outbound(profile: chainEntryProfile, tag: "chain-entry"))
+      result.append(try outbound(profile: profile, tag: "proxy-out", detour: "chain-entry"))
+    } else {
+      result.append(try outbound(profile: profile, tag: "proxy-out"))
+    }
+    result.append(["type": "direct", "tag": "direct"])
+    result.append(["type": "block", "tag": "block"])
+    return result
+  }
+
+  private func outbound(profile: TunnelProfile, tag: String, detour: String? = nil) throws -> [String: Any] {
     guard let port = profile.serverPort else { throw GeneratorError.missingPort(profile) }
 
     switch profile.proto {
@@ -130,7 +141,7 @@ struct SingBoxConfigGenerator {
       }
       var object: [String: Any] = [
         "type": "vless",
-        "tag": "proxy-out",
+        "tag": tag,
         "server": profile.serverHost,
         "server_port": port,
         "uuid": uuid,
@@ -146,12 +157,13 @@ struct SingBoxConfigGenerator {
       if let transport = transportObject(profile: profile) {
         object["transport"] = transport
       }
+      if let detour { object["detour"] = detour }
       return object
 
     case .socks:
       var object: [String: Any] = [
         "type": "socks",
-        "tag": "proxy-out",
+        "tag": tag,
         "server": profile.serverHost,
         "server_port": port,
         "version": profile.queryItems["version"] ?? "5",
@@ -159,6 +171,7 @@ struct SingBoxConfigGenerator {
       ]
       if let username = profile.primaryUser, !username.isEmpty { object["username"] = username }
       if let password = profile.secret, !password.isEmpty { object["password"] = password }
+      if let detour { object["detour"] = detour }
       return object
 
     case .trojan:
@@ -167,7 +180,7 @@ struct SingBoxConfigGenerator {
       }
       var object: [String: Any] = [
         "type": "trojan",
-        "tag": "proxy-out",
+        "tag": tag,
         "server": profile.serverHost,
         "server_port": port,
         "password": password,
@@ -175,6 +188,7 @@ struct SingBoxConfigGenerator {
       if let tls = tlsObject(profile: profile, defaultEnabled: true) {
         object["tls"] = tls
       }
+      if let detour { object["detour"] = detour }
       return object
 
     default:
