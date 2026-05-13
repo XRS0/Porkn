@@ -1,3 +1,4 @@
+using System.Text;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Fonts.Inter;
@@ -12,6 +13,7 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -171,7 +172,7 @@ internal sealed class RasDialManager
         onLog($"Connecting Windows RAS VPN: {entryName}");
         var result = await RunRasDialAsync(arguments.ToString(), TimeSpan.FromSeconds(70), cancellationToken);
         LogOutput(result, onLog);
-        if (result.ExitCode != 0) throw new InvalidOperationException($"rasdial failed with code {result.ExitCode}: {LastLine(result)}");
+        if (result.ExitCode != 0) throw new RasDialException(result.ExitCode, LastLine(result));
     }
 
     public async Task DisconnectAsync(Profile profile, Action<string> onLog, CancellationToken cancellationToken = default)
@@ -213,6 +214,8 @@ internal sealed class RasDialManager
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                StandardOutputEncoding = RasOutputEncoding(),
+                StandardErrorEncoding = RasOutputEncoding(),
                 CreateNoWindow = true
             }
         };
@@ -231,6 +234,15 @@ internal sealed class RasDialManager
         }
         return new RasDialResult(process.ExitCode, await stdoutTask, await stderrTask);
     }
+
+    private static Encoding RasOutputEncoding()
+    {
+        try { return Encoding.GetEncoding((int)GetOEMCP()); }
+        catch { return Encoding.Default; }
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetOEMCP();
 
     private static void TryKill(Process process)
     {
@@ -260,4 +272,29 @@ internal sealed class RasDialManager
     private static string Quote(string value) => "\"" + value.Replace("\"", "\\\"") + "\"";
 
     private sealed record RasDialResult(int ExitCode, string StandardOutput, string StandardError);
+}
+
+internal sealed class RasDialException : InvalidOperationException
+{
+    public RasDialException(int errorCode, string rawMessage)
+        : base(BuildMessage(errorCode, rawMessage))
+    {
+        ErrorCode = errorCode;
+        RawMessage = rawMessage;
+    }
+
+    public int ErrorCode { get; }
+    public string RawMessage { get; }
+
+    private static string BuildMessage(int errorCode, string rawMessage)
+    {
+        var hint = errorCode switch
+        {
+            809 => "Windows RAS error 809: the VPN server did not respond or the VPN port/protocol is blocked. PBK/RAS is a Windows system VPN and does not use porkn System Proxy for its own handshake; to force the PBK handshake through another node, a real TUN/full-VPN layer is required.",
+            _ => $"Windows RAS error {errorCode}."
+        };
+        return string.IsNullOrWhiteSpace(rawMessage)
+            ? hint
+            : $"{hint} Raw rasdial message: {rawMessage}";
+    }
 }

@@ -11,7 +11,8 @@ internal enum ProxyHealthKind
     Protected,
     ProxyReachable,
     RemoteCheckFailed,
-    LocalProxyFailed
+    LocalProxyFailed,
+    ChainFailed
 }
 
 internal sealed class ProxyHealthStatus
@@ -27,6 +28,7 @@ internal sealed class ProxyHealthStatus
     public static ProxyHealthStatus ProxyReachable() => new() { Kind = ProxyHealthKind.ProxyReachable, Title = "Proxy reachable", Detail = "Local proxy works, remote IP check returned no IP." };
     public static ProxyHealthStatus RemoteFailed(string message) => new() { Kind = ProxyHealthKind.RemoteCheckFailed, Title = "Remote check failed", Detail = message };
     public static ProxyHealthStatus LocalFailed(string message) => new() { Kind = ProxyHealthKind.LocalProxyFailed, Title = "Local proxy failed", Detail = message };
+    public static ProxyHealthStatus ChainFailed(string message) => new() { Kind = ProxyHealthKind.ChainFailed, Title = "VPN Chain failed", Detail = message };
 }
 
 internal sealed class ProxyHealthCheckService

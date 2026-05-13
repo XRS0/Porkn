@@ -589,6 +589,7 @@ internal sealed class MainWindow : Window
         ProxyHealthKind.Protected or ProxyHealthKind.ProxyReachable => T("Защищено", "Protected"),
         ProxyHealthKind.Checking => T("Проверка защиты", "Checking protection"),
         ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => T("Подключено с предупреждением", "Connected with warning"),
+        ProxyHealthKind.ChainFailed => T("VPN Chain не подключён", "VPN Chain failed"),
         _ => T("Подключено", "Connected")
     };
 
@@ -596,7 +597,7 @@ internal sealed class MainWindow : Window
     {
         ProxyHealthKind.Protected or ProxyHealthKind.ProxyReachable => Ui.Green,
         ProxyHealthKind.Checking => Ui.Blue,
-        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => Ui.Warning,
+        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed or ProxyHealthKind.ChainFailed => Ui.Warning,
         _ => Ui.PrimaryText
     };
 
@@ -661,6 +662,7 @@ internal sealed class MainWindow : Window
         ProxyHealthKind.Checking => T("Проверка", "Checking"),
         ProxyHealthKind.RemoteCheckFailed => T("Удалённая проверка не удалась", "Remote check failed"),
         ProxyHealthKind.LocalProxyFailed => T("Локальный proxy недоступен", "Local proxy failed"),
+        ProxyHealthKind.ChainFailed => T("VPN Chain не подключён", "VPN Chain failed"),
         _ => T("Не проверено", "Not checked")
     };
 
@@ -670,7 +672,7 @@ internal sealed class MainWindow : Window
         ProxyHealthKind.Protected => T($"Proxy доступен. Remote IP: {ExtractRemoteIp(_healthStatus.Detail)}", $"Proxy is reachable. Remote IP: {ExtractRemoteIp(_healthStatus.Detail)}"),
         ProxyHealthKind.ProxyReachable => T("Локальный proxy работает, remote IP check не вернул IP.", "Local proxy works, remote IP check returned no IP."),
         ProxyHealthKind.Checking => T("Проверяем локальный proxy и удалённый маршрут…", "Verifying local proxy and remote path…"),
-        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => _healthStatus.Detail,
+        ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed or ProxyHealthKind.ChainFailed => _healthStatus.Detail,
         _ => T("Подключись, чтобы проверить маршрут.", "Connect to verify the route.")
     };
 
@@ -681,7 +683,7 @@ internal sealed class MainWindow : Window
         {
             ProxyHealthKind.Protected or ProxyHealthKind.ProxyReachable => Ui.GreenSoft,
             ProxyHealthKind.Checking => Ui.BlueSoft,
-            ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed => Ui.WarningSoft,
+            ProxyHealthKind.RemoteCheckFailed or ProxyHealthKind.LocalProxyFailed or ProxyHealthKind.ChainFailed => Ui.WarningSoft,
             _ => Ui.SubtleBackground
         };
         var stack = new StackPanel { Spacing = 3 };
@@ -1346,8 +1348,9 @@ internal sealed class MainWindow : Window
             {
                 _manualStopInProgress = false;
             }
-            _healthStatus = ProxyHealthStatus.LocalFailed(ex.Message);
-            AppendLog(T("VPN Chain не удалось подключить: ", "VPN Chain connect failed: ") + ex.Message);
+            var message = UserFacingConnectError(ex);
+            _healthStatus = ProxyHealthStatus.ChainFailed(message);
+            AppendLog(T("VPN Chain не удалось подключить: ", "VPN Chain connect failed: ") + message);
             RefreshAll();
         }
     }
@@ -1458,8 +1461,9 @@ internal sealed class MainWindow : Window
             {
                 _manualStopInProgress = false;
             }
-            _healthStatus = ProxyHealthStatus.LocalFailed(ex.Message);
-            AppendLog(T("Подключение не удалось: ", "Connect failed: ") + ex.Message);
+            var message = UserFacingConnectError(ex);
+            _healthStatus = ProfileKinds.IsRasProfile(profile) ? ProxyHealthStatus.ChainFailed(message) : ProxyHealthStatus.LocalFailed(message);
+            AppendLog(T("Подключение не удалось: ", "Connect failed: ") + message);
             RefreshAll();
         }
     }
@@ -1688,6 +1692,25 @@ internal sealed class MainWindow : Window
     {
         try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
         catch { }
+    }
+
+    private string UserFacingConnectError(Exception ex)
+    {
+        if (ex is RasDialException { ErrorCode: 809 } rasError)
+        {
+            return T(
+                "PBK/RAS не подключился: Windows вернул ошибку 809 — VPN-сервер не отвечает или порт/протокол заблокирован. Важно: Windows RAS/PBK не использует porkn System Proxy для собственного handshake; чтобы сам PBK handshake шёл через первый узел, нужен настоящий TUN/full-VPN слой. Raw rasdial: " + rasError.RawMessage,
+                "PBK/RAS did not connect: Windows returned error 809 — the VPN server did not respond or the port/protocol is blocked. Important: Windows RAS/PBK does not use porkn System Proxy for its own handshake; forcing the PBK handshake through the first node requires a real TUN/full-VPN layer. Raw rasdial: " + rasError.RawMessage);
+        }
+
+        if (ex is RasDialException rasDialError)
+        {
+            return T(
+                $"PBK/RAS не подключился: Windows rasdial вернул код {rasDialError.ErrorCode}. Raw rasdial: {rasDialError.RawMessage}",
+                $"PBK/RAS did not connect: Windows rasdial returned code {rasDialError.ErrorCode}. Raw rasdial: {rasDialError.RawMessage}");
+        }
+
+        return ex.Message;
     }
 
     private string T(string ru, string en) => L10n.Text(Settings.Language, ru, en);
